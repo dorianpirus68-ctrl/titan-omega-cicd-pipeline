@@ -1,4 +1,4 @@
-name: LML XTREND SCALPING AGI - V36 SNIPER
+name: LML XTREND SCALPING AGI - V36.1 SNIPER
 
 on:
   push:
@@ -98,7 +98,7 @@ jobs:
           plugins { id "com.android.application" }
           def runNumber = System.getenv("GITHUB_RUN_NUMBER")
           def autoVersionCode = runNumber != null ? runNumber.toInteger() : 1
-          def autoVersionName = "3.0.SNIPER." + autoVersionCode
+          def autoVersionName = "3.1.SNIPER." + autoVersionCode
           android {
               namespace "com.lml.tradingbot"
               compileSdk 34
@@ -131,7 +131,7 @@ jobs:
           cat > app/src/main/res/values/strings.xml <<'EOF'
           <resources>
               <string name="app_name">LML XTrend Sniper AGI</string>
-              <string name="accessibility_desc">LML XTrend AGI : Agent de scalping autonome avec ciblage laser et HUD de diagnostic en temps réel.</string>
+              <string name="accessibility_desc">LML XTrend AGI (Radar Actif) : Agent de scalping avec ciblage laser et scanning continu.</string>
           </resources>
           EOF
 
@@ -164,6 +164,7 @@ jobs:
           </manifest>
           EOF
 
+          # MODIFICATION 1 : Le HUD est plus petit, plus transparent et placé en bas
           cat > app/src/main/java/com/lml/tradingbot/TradingOverlayService.java <<'EOF'
           package com.lml.tradingbot;
           import android.app.Service; import android.content.Intent; import android.graphics.Canvas; import android.graphics.Color; import android.graphics.Paint; import android.graphics.PixelFormat; import android.graphics.Rect; import android.graphics.drawable.GradientDrawable; import android.os.Handler; import android.os.IBinder; import android.os.Looper; import android.text.Html; import android.view.Gravity; import android.view.View; import android.view.WindowManager; import android.widget.LinearLayout; import android.widget.ScrollView; import android.widget.TextView;
@@ -178,23 +179,26 @@ jobs:
               @Override public void onCreate() {
                   super.onCreate(); INSTANCE = this; wm = (WindowManager) getSystemService(WINDOW_SERVICE);
                   
-                  // 1. LE HUD (CONSOLE)
+                  // 1. LE HUD (CONSOLE) - Modifié pour être moins intrusif
                   WindowManager.LayoutParams hudParams = new WindowManager.LayoutParams(
-                      WindowManager.LayoutParams.MATCH_PARENT, 350,
+                      WindowManager.LayoutParams.MATCH_PARENT, 200, // Hauteur réduite
                       WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                       WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
                       PixelFormat.TRANSLUCENT
                   );
-                  hudParams.gravity = Gravity.TOP | Gravity.START; hudParams.y = 100;
+                  hudParams.gravity = Gravity.BOTTOM | Gravity.START; // Placé en bas
+                  hudParams.y = 150; // Marge par rapport au bas
                   
-                  panel = new LinearLayout(this); panel.setOrientation(LinearLayout.VERTICAL); panel.setPadding(20, 20, 20, 20);
-                  GradientDrawable bg = new GradientDrawable(); bg.setColor(Color.parseColor("#CC000000")); bg.setStroke(3, Color.parseColor("#FFD700")); bg.setCornerRadius(10);
+                  panel = new LinearLayout(this); panel.setOrientation(LinearLayout.VERTICAL); panel.setPadding(15, 10, 15, 10);
+                  GradientDrawable bg = new GradientDrawable(); 
+                  bg.setColor(Color.parseColor("#99000000")); // Plus de transparence
+                  bg.setStroke(2, Color.parseColor("#FFD700")); bg.setCornerRadius(10);
                   panel.setBackground(bg);
                   
-                  TextView title = new TextView(this); title.setText("LML AGI - V36 SNIPER TERMINAL"); title.setTextColor(Color.parseColor("#FFD700")); title.setTextSize(11); title.setTypeface(null, android.graphics.Typeface.BOLD);
+                  TextView title = new TextView(this); title.setText("LML V36.1 - RADAR ACTIF"); title.setTextColor(Color.parseColor("#FFD700")); title.setTextSize(10); title.setTypeface(null, android.graphics.Typeface.BOLD);
                   panel.addView(title);
                   
-                  scroll = new ScrollView(this); console = new TextView(this); console.setTextColor(Color.WHITE); console.setTextSize(10);
+                  scroll = new ScrollView(this); console = new TextView(this); console.setTextColor(Color.WHITE); console.setTextSize(9);
                   scroll.addView(console); panel.addView(scroll); wm.addView(panel, hudParams);
                   
                   // 2. LE SYSTÈME DE CIBLAGE LASER (PLEIN ÉCRAN)
@@ -206,7 +210,7 @@ jobs:
                   );
                   laserView = new LaserView(this); wm.addView(laserView, laserParams);
                   
-                  logHUD("<font color='#00FFFF'>Système de visée initialisé. En attente de XTrend Lite...</font>");
+                  logHUD("<font color='#00FFFF'>HUD en ligne. Mode Radar activé.</font>");
               }
 
               public void logHUD(final String msg) {
@@ -219,17 +223,11 @@ jobs:
               }
 
               public void drawLaser(Rect target, String actionType) {
-                  mainHandler.post(() -> {
-                      laserView.setTarget(target, actionType);
-                      laserView.invalidate();
-                  });
+                  mainHandler.post(() -> { laserView.setTarget(target, actionType); laserView.invalidate(); });
               }
               
               public void clearLaser() {
-                  mainHandler.post(() -> {
-                      laserView.clearTarget();
-                      laserView.invalidate();
-                  });
+                  mainHandler.post(() -> { laserView.clearTarget(); laserView.invalidate(); });
               }
 
               @Override public void onDestroy() {
@@ -250,19 +248,13 @@ jobs:
                   @Override protected void onDraw(Canvas canvas) {
                       super.onDraw(canvas);
                       if (t != null) {
-                          // Couleur dynamique : Vert pour Achat, Rouge pour Vente, Or par défaut
                           if(type.equals("ACHAT")) { paintBox.setColor(Color.parseColor("#00FF00")); paintCross.setColor(Color.parseColor("#00FF00")); }
                           else if (type.equals("VENTE")) { paintBox.setColor(Color.parseColor("#FF0000")); paintCross.setColor(Color.parseColor("#FF0000")); }
                           else { paintBox.setColor(Color.parseColor("#FFD700")); paintCross.setColor(Color.parseColor("#FFD700")); }
-                          
-                          // Dessine la boîte
                           canvas.drawRect(t, paintBox);
-                          // Dessine le réticule (croix)
                           int cx = t.centerX(); int cy = t.centerY();
                           canvas.drawLine(cx, t.top - 40, cx, t.bottom + 40, paintCross);
                           canvas.drawLine(t.left - 40, cy, t.right + 40, cy, paintCross);
-                          
-                          // Ombre rouge clignotante au centre
                           Paint center = new Paint(); center.setColor(Color.parseColor("#88FF0000"));
                           canvas.drawCircle(cx, cy, 15, center);
                       }
@@ -271,6 +263,7 @@ jobs:
           }
           EOF
 
+          # MODIFICATION 2 : Passage au Radar Actif (Polling) et recherche améliorée
           cat > app/src/main/java/com/lml/tradingbot/TradingAccessibility.java <<'EOF'
           package com.lml.tradingbot;
           import android.accessibilityservice.AccessibilityService; import android.accessibilityservice.GestureDescription; import android.graphics.Path; import android.graphics.Rect; import android.os.Handler; import android.os.Looper; import android.view.accessibility.AccessibilityEvent; import android.view.accessibility.AccessibilityNodeInfo;
@@ -279,56 +272,85 @@ jobs:
               public static TradingAccessibility INSTANCE;
               private Handler handler = new Handler(Looper.getMainLooper());
               private boolean isProcessing = false;
+              private int scanCount = 0;
 
-              @Override protected void onServiceConnected() { INSTANCE = this; }
-              
-              @Override public void onAccessibilityEvent(AccessibilityEvent e) { 
-                  if (isProcessing || TradingOverlayService.INSTANCE == null) return;
-                  
-                  if (e.getEventType() == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED || e.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-                      AccessibilityNodeInfo root = getRootInActiveWindow();
-                      if (root == null) return;
-                      
-                      // SCAN 1 : Détection du solde pour éviter de trader à 0
-                      AccessibilityNodeInfo soldeNode = findNodeByText(root, "compte réel");
-                      if (soldeNode != null && soldeNode.getText() != null) {
-                          // TradingOverlayService.INSTANCE.logHUD("<font color='#AAAAAA'>Monitoring: " + soldeNode.getText() + "</font>");
+              // LE RADAR ACTIF : S'exécute en boucle toutes les secondes
+              private Runnable radarRunnable = new Runnable() {
+                  @Override
+                  public void run() {
+                      if (!isProcessing && TradingOverlayService.INSTANCE != null) {
+                          scanMarketScreen();
                       }
-
-                      // SCAN 2 : Logique de scalping (Exemple: Cherche le bouton ACHETER)
-                      AccessibilityNodeInfo buyBtn = findNodeByText(root, "acheter");
-                      
-                      if (buyBtn != null && buyBtn.isClickable()) {
-                          isProcessing = true;
-                          Rect bounds = new Rect(); buyBtn.getBoundsInScreen(bounds);
-                          
-                          TradingOverlayService.INSTANCE.logHUD("<font color='#FFD700'>[AGI] Opportunité détectée. Verrouillage de la cible...</font>");
-                          // Affiche le laser sur le bouton
-                          TradingOverlayService.INSTANCE.drawLaser(bounds, "ACHAT");
-                          
-                          // Compte à rebours avant la frappe (laisse le temps d'annuler ou de vérifier)
-                          handler.postDelayed(() -> {
-                              TradingOverlayService.INSTANCE.logHUD("<font color='#FF4040'>[AGI] IMPACT: Clic physique simulé.</font>");
-                              executeTrade(bounds.centerX(), bounds.centerY());
-                              TradingOverlayService.INSTANCE.clearLaser();
-                              
-                              // Cooldown de sécurité (Pause de 5 secondes après un trade)
-                              handler.postDelayed(() -> {
-                                  TradingOverlayService.INSTANCE.logHUD("<font color='#00FFFF'>[AGI] Cooldown terminé. Reprise du scan.</font>");
-                                  isProcessing = false;
-                              }, 5000);
-                              
-                          }, 1500); // 1.5 seconde de visée visuelle
-                      }
+                      handler.postDelayed(this, 1000); // Scanne toutes les 1000ms
                   }
+              };
+
+              @Override protected void onServiceConnected() { 
+                  INSTANCE = this; 
+                  // Démarrage du radar dès la connexion du service
+                  handler.postDelayed(radarRunnable, 2000);
               }
               
+              @Override public void onAccessibilityEvent(AccessibilityEvent e) { 
+                  // On garde les événements passifs au cas où, mais le radar fait le gros du travail
+              }
+              
+              private void scanMarketScreen() {
+                  AccessibilityNodeInfo root = getRootInActiveWindow();
+                  if (root == null) return;
+                  
+                  scanCount++;
+                  if (scanCount % 5 == 0) { // Affiche un ping toutes les 5 secondes pour confirmer que le robot tourne
+                      TradingOverlayService.INSTANCE.logHUD("<font color='#555555'>Ping radar...</font>");
+                  }
+
+                  // STRATÉGIE DE TEST : Cherche le bouton Acheter ou Vendre
+                  AccessibilityNodeInfo buyBtn = findNodeByText(root, "acheter");
+                  AccessibilityNodeInfo sellBtn = findNodeByText(root, "vendre");
+                  
+                  // LOGIQUE D'EXÉCUTION (À adapter selon votre algorithme IA)
+                  AccessibilityNodeInfo targetBtn = null;
+                  String actionName = "";
+                  
+                  // Pour l'instant, on cible le premier bouton détecté pour tester le laser
+                  if (buyBtn != null && buyBtn.isClickable()) { targetBtn = buyBtn; actionName = "ACHAT"; }
+                  else if (sellBtn != null && sellBtn.isClickable()) { targetBtn = sellBtn; actionName = "VENTE"; }
+                  
+                  if (targetBtn != null) {
+                      isProcessing = true;
+                      Rect bounds = new Rect(); targetBtn.getBoundsInScreen(bounds);
+                      
+                      TradingOverlayService.INSTANCE.logHUD("<font color='#FFD700'>[AGI] Bouton " + actionName + " détecté. Verrouillage...</font>");
+                      TradingOverlayService.INSTANCE.drawLaser(bounds, actionName);
+                      
+                      // Simulation de clic (Désactivé pour ce test, décommentez executeTrade pour de vrai)
+                      handler.postDelayed(() -> {
+                          TradingOverlayService.INSTANCE.logHUD("<font color='#FF4040'>[AGI] Simulation d'impact sur " + actionName + ".</font>");
+                          // executeTrade(bounds.centerX(), bounds.centerY()); // <--- DÉCOMMENTER POUR CLIQUER VRAIMENT
+                          TradingOverlayService.INSTANCE.clearLaser();
+                          
+                          handler.postDelayed(() -> {
+                              TradingOverlayService.INSTANCE.logHUD("<font color='#00FFFF'>[AGI] Reprise du radar.</font>");
+                              isProcessing = false;
+                          }, 5000);
+                          
+                      }, 1500);
+                  }
+                  root.recycle();
+              }
+
               @Override public void onInterrupt() {}
               
+              // RECHERCHE AMÉLIORÉE : Regarde le Text ET le ContentDescription
               public AccessibilityNodeInfo findNodeByText(AccessibilityNodeInfo root, String target) {
                   if (root == null) return null;
-                  if (root.getText() != null && root.getText().toString().toLowerCase().contains(target)) return root;
-                  if (root.getContentDescription() != null && root.getContentDescription().toString().toLowerCase().contains(target)) return root;
+                  
+                  CharSequence txt = root.getText();
+                  CharSequence desc = root.getContentDescription();
+                  
+                  if (txt != null && txt.toString().toLowerCase().trim().contains(target)) return root;
+                  if (desc != null && desc.toString().toLowerCase().trim().contains(target)) return root;
+                  
                   for (int i = 0; i < root.getChildCount(); i++) {
                       AccessibilityNodeInfo res = findNodeByText(root.getChild(i), target);
                       if (res != null) return res;
@@ -353,8 +375,8 @@ jobs:
                   super.onCreate(b);
                   LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(0xFF000000); root.setPadding(50, 100, 50, 50);
                   
-                  TextView title = new TextView(this); title.setText("LML AGI V36 : SNIPER"); title.setTextColor(0xFFFFD700); title.setTextSize(24); root.addView(title);
-                  TextView sub = new TextView(this); sub.setText("1. Activez Overlay\n2. Activez Accessibilité\n3. Lancez le HUD"); sub.setTextColor(0xFFAAAAAA); sub.setPadding(0,20,0,40); root.addView(sub);
+                  TextView title = new TextView(this); title.setText("LML AGI V36.1 : SNIPER"); title.setTextColor(0xFFFFD700); title.setTextSize(24); root.addView(title);
+                  TextView sub = new TextView(this); sub.setText("Radar Actif & HUD optimisé\n\n1. Activez Overlay\n2. Activez Accessibilité\n3. Lancez le HUD"); sub.setTextColor(0xFFAAAAAA); sub.setPadding(0,20,0,40); root.addView(sub);
                   
                   Button btnOverlay = new Button(this); btnOverlay.setText("1. AUTORISER OVERLAY"); btnOverlay.setBackgroundColor(0xFF222222); btnOverlay.setTextColor(Color.WHITE);
                   btnOverlay.setOnClickListener(v -> startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()))));
@@ -393,11 +415,11 @@ jobs:
         run: |
           VERSION="1.0.${GITHUB_RUN_NUMBER}"
           mkdir -p release-apk
-          cp app/build/outputs/apk/release/app-release.apk "release-apk/LML-SNIPER-AGI-${VERSION}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "release-apk/LML-SNIPER-V36.1-${VERSION}.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LML-XTREND-SNIPER-APK
+          name: LML-XTREND-SNIPER-V36-1-APK
           path: release-apk/*.apk
 
