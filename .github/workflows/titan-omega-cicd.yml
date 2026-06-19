@@ -28,7 +28,7 @@ jobs:
         with:
           gradle-version: 8.7
 
-      - name: Create 10K+ LINES TITAN OMEGA AGI project (even more lines)
+      - name: Create 10K+ LINES TITAN OMEGA AGI project (more lines in YAML file)
         run: |
           rm -rf app
           mkdir -p app/src/main/java/com/lml/robotai
