@@ -14,47 +14,309 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Environment
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y default-jdk
-          
-      - name: Create Project Structure
+      - name: Build Project Structure and Files
         run: |
           mkdir -p app/src/main/java/com/lml/tradingbot
           mkdir -p app/src/main/res/xml
-          mkdir -p app/src/main/res/values
 
-      - name: Inject Core Logic (Java)
-        run: |
-          # [NOTE: Le code Java complet doit être injecté ici. 
-          # Assurez-vous d'avoir inséré le TradingAccessibility avec le Radar Actif 
-          # et le TradingOverlayService avec le HUD transparent.]
-          
-          # Ici, nous créons le fichier de configuration de l'Accessibilité
+          # 1. AndroidManifest.xml
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.lml.tradingbot">
+              <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+              <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE" />
+              <application android:label="LML XTREND AGI">
+                  <service android:name=".TradingAccessibility" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="true">
+                      <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
+                      <meta-data android:name="android.accessibilityservice" android:resource="@xml/accessibility_service_config" />
+                  </service>
+                  <service android:name=".TradingOverlayService" />
+              </application>
+          </manifest>
+          EOF
+
+          # 2. Config Accessibilité
           cat > app/src/main/res/xml/accessibility_service_config.xml <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
               android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
               android:accessibilityFeedbackType="feedbackGeneric"
-              android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
               android:canRetrieveWindowContent="true"
-              android:canPerformGestures="true"
-              android:notificationTimeout="50" />
+              android:canPerformGestures="true" />
           EOF
 
-      - name: Setup Gradle & Build
-        run: |
-          cat > build.gradle <<'EOF'
-          plugins { id "com.android.application" version "8.5.2" apply false }
+          # 3. TradingAccessibility.java (Logique de Pop-up et Apprentissage)
+          cat > app/src/main/java/com/lml/tradingbot/TradingAccessibility.java <<'EOF'
+          package com.lml.tradingbot;
+          import android.accessibilityservice.AccessibilityService;
+          import android.view.accessibility.AccessibilityEvent;
+          import android.view.accessibility.AccessibilityNodeInfo;
+          import android.content.Intent;
+
+          public class TradingAccessibility extends AccessibilityService {
+              private double lastPrice = 0.0;
+              private long lastUpdateTime = 0;
+              
+              private double seuilMomentum = 10.0; 
+              private boolean enPosition = false; 
+              private double prixEntree = 0.0;
+              private String typeTrade = ""; 
+              private double capitalSimule = 100.0; 
+
+              @Override
+              public void onServiceConnected() { 
+                  startService(new Intent(this, TradingOverlayService.class)); 
+              }
+
+              @Override
+              public void onAccessibilityEvent(AccessibilityEvent event) {
+                  if (System.currentTimeMillis() - lastUpdateTime < 200) return; 
+                  
+                  AccessibilityNodeInfo rootNode = getRootInActiveWindow();
+                  if (rootNode != null) {
+                      // Si on est dans un trade, on scanne l'écran pour trouver le Pop-up de résultat
+                      if (enPosition) {
+                          if (verifierPopUpFinDeTrade(rootNode)) {
+                              enPosition = false;
+                              lastPrice = 0.0; // Reset pour ne pas fausser le prochain calcul
+                              mettreAJourHUD("SCAN (Analyse du marché)", 0.0);
+                          }
+                      } 
+                      // Sinon, on cherche une opportunité
+                      else {
+                          chercherPrixEtAnalyser(rootNode, rootNode);
+                      }
+                  }
+              }
+
+              // --- LECTURE DU RÉSULTAT (VISUEL) ---
+              private boolean verifierPopUpFinDeTrade(AccessibilityNodeInfo node) {
+                  if (node == null) return false;
+                  
+                  CharSequence textSeq = node.getText();
+                  if (textSeq != null) {
+                      String text = textSeq.toString().toUpperCase();
+                      
+                      // Détection d'un Gain
+                      if (text.contains("+0.75")) {
+                          gagnerTrade();
+                          cliquerSurBouton(getRootInActiveWindow(), "CONTINUE"); // Ferme la boîte
+                          return true;
+                      }
+                      // Détection d'une Perte
+                      if (text.contains("-1C") || text.contains("-1.0")) {
+                          perdreTrade();
+                          cliquerSurBouton(getRootInActiveWindow(), "CONTINUE"); // Ferme la boîte
+                          return true;
+                      }
+                  }
+                  
+                  for (int i = 0; i < node.getChildCount(); i++) {
+                      if (verifierPopUpFinDeTrade(node.getChild(i))) return true;
+                  }
+                  return false;
+              }
+
+              // --- PRISE DE POSITION ---
+              private void chercherPrixEtAnalyser(AccessibilityNodeInfo node, AccessibilityNodeInfo root) {
+                  if (node == null) return;
+                  
+                  if (node.getClassName() != null && node.getClassName().toString().equals("android.widget.TextView")) {
+                      CharSequence textSeq = node.getText();
+                      if (textSeq != null) {
+                          String text = textSeq.toString().trim().replace(",", ""); 
+                          if (text.matches("^[0-9]+(\\.[0-9]+)?$")) { 
+                              try {
+                                  double currentPrice = Double.parseDouble(text);
+                                  if (currentPrice > 1000) { // Filtre du BTCUSD
+                                      analyserMomentum(currentPrice, root);
+                                      lastUpdateTime = System.currentTimeMillis();
+                                      return;
+                                  }
+                              } catch (Exception e) {}
+                          }
+                      }
+                  }
+                  for (int i = 0; i < node.getChildCount(); i++) {
+                      chercherPrixEtAnalyser(node.getChild(i), root);
+                  }
+                  node.recycle();
+              }
+
+              private void analyserMomentum(double currentPrice, AccessibilityNodeInfo root) {
+                  if (lastPrice == 0.0) { lastPrice = currentPrice; return; }
+                  double diff = currentPrice - lastPrice;
+
+                  if (diff > seuilMomentum) {
+                      if (cliquerSurBouton(root, "ACHETER")) { 
+                          enPosition = true; prixEntree = currentPrice; typeTrade = "ACHETER";
+                          mettreAJourHUD("ACHAT (Trade en cours...)", currentPrice);
+                      }
+                  } else if (diff < -seuilMomentum) {
+                      if (cliquerSurBouton(root, "VENDRE")) { 
+                          enPosition = true; prixEntree = currentPrice; typeTrade = "VENDRE";
+                          mettreAJourHUD("VENTE (Trade en cours...)", currentPrice);
+                      }
+                  } else {
+                      mettreAJourHUD("SCAN...", currentPrice);
+                  }
+                  
+                  lastPrice = currentPrice;
+              }
+
+              // --- LOGIQUE D'APPRENTISSAGE ---
+              private void gagnerTrade() {
+                  capitalSimule += 0.70; 
+                  if (seuilMomentum > 5.0) seuilMomentum -= 0.5; // Bot plus confiant
+              }
+
+              private void perdreTrade() {
+                  capitalSimule -= 1.00; 
+                  seuilMomentum += 1.0; // Bot plus prudent
+              }
+
+              private boolean cliquerSurBouton(AccessibilityNodeInfo node, String texteRecherche) {
+                  if (node == null) return false;
+                  CharSequence text = node.getText();
+                  CharSequence contentDesc = node.getContentDescription();
+                  
+                  if ((text != null && text.toString().toUpperCase().contains(texteRecherche)) ||
+                      (contentDesc != null && contentDesc.toString().toUpperCase().contains(texteRecherche))) {
+                      if (node.isClickable()) {
+                          node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                          return true;
+                      } else if (node.getParent() != null && node.getParent().isClickable()) {
+                          node.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                          return true;
+                      }
+                  }
+                  
+                  for (int i = 0; i < node.getChildCount(); i++) {
+                      if (cliquerSurBouton(node.getChild(i), texteRecherche)) return true;
+                  }
+                  return false;
+              }
+
+              private void mettreAJourHUD(String signal, double currentPrice) {
+                  Intent intent = new Intent("COM_LML_TRADING_UPDATE");
+                  intent.putExtra("SIGNAL", signal);
+                  intent.putExtra("PRICE", String.valueOf(currentPrice));
+                  intent.putExtra("CAPITAL", String.format("%.2f", capitalSimule));
+                  intent.putExtra("SEUIL", String.format("%.2f", seuilMomentum));
+                  sendBroadcast(intent);
+              }
+
+              @Override
+              public void onInterrupt() {}
+          }
           EOF
-          
-          # Configuration simplifiée pour la build
-          gradle assembleRelease --no-daemon
+
+          # 4. TradingOverlayService.java
+          cat > app/src/main/java/com/lml/tradingbot/TradingOverlayService.java <<'EOF'
+          package com.lml.tradingbot;
+          import android.app.Service;
+          import android.os.IBinder;
+          import android.content.Intent;
+          import android.content.IntentFilter;
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
+          import android.view.WindowManager;
+          import android.widget.TextView;
+          import android.graphics.PixelFormat;
+          import android.view.Gravity;
+          import android.graphics.Color;
+
+          public class TradingOverlayService extends Service {
+              private WindowManager wm;
+              private TextView hud;
+              private SignalReceiver receiver;
+
+              @Override
+              public void onCreate() {
+                  super.onCreate();
+                  wm = (WindowManager) getSystemService(WINDOW_SERVICE);
+                  hud = new TextView(this);
+                  hud.setText("ION SNIPER: PRÊT");
+                  hud.setTextColor(Color.WHITE);
+                  hud.setTextSize(14f);
+                  hud.setBackgroundColor(Color.parseColor("#BB000000")); 
+                  hud.setPadding(15, 15, 15, 15);
+
+                  WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                      WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
+                      WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                      WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT);
+                  params.gravity = Gravity.TOP | Gravity.START;
+                  params.y = 200; 
+                  wm.addView(hud, params);
+
+                  receiver = new SignalReceiver();
+                  registerReceiver(receiver, new IntentFilter("COM_LML_TRADING_UPDATE"), Context.RECEIVER_EXPORTED);
+              }
+
+              @Override
+              public void onDestroy() {
+                  super.onDestroy();
+                  if (hud != null) wm.removeView(hud);
+                  if (receiver != null) unregisterReceiver(receiver);
+              }
+
+              @Override
+              public IBinder onBind(Intent intent) { return null; }
+
+              private class SignalReceiver extends BroadcastReceiver {
+                  @Override
+                  public void onReceive(Context context, Intent intent) {
+                      if (intent != null && "COM_LML_TRADING_UPDATE".equals(intent.getAction())) {
+                          String signal = intent.getStringExtra("SIGNAL");
+                          String price = intent.getStringExtra("PRICE");
+                          String capital = intent.getStringExtra("CAPITAL");
+                          String seuil = intent.getStringExtra("SEUIL");
+                          
+                          String texteAffichage = "BTCUSD: " + price + "\n" +
+                                                  "Action: " + signal + "\n" +
+                                                  "Capital: " + capital + "$\n" +
+                                                  "Volatilité Req: " + seuil + "$";
+                          hud.setText(texteAffichage);
+                          
+                          if (signal.contains("ACHAT")) hud.setTextColor(Color.GREEN);
+                          else if (signal.contains("VENTE")) hud.setTextColor(Color.RED);
+                          else hud.setTextColor(Color.WHITE);
+                      }
+                  }
+              }
+          }
+          EOF
+
+          # 5. settings.gradle
+          cat > settings.gradle <<'EOF'
+          rootProject.name = "LML_XTREND_AGI"
+          include ':app'
+          EOF
+
+          # 6. app/build.gradle
+          cat > app/build.gradle <<'EOF'
+          plugins { id 'com.android.application' }
+          android {
+              namespace 'com.lml.tradingbot'
+              compileSdk 34
+              defaultConfig {
+                  applicationId "com.lml.tradingbot"
+                  minSdk 33
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
+              }
+          }
+          EOF
+
+      - name: Build APK
+        run: |
+          chmod +x gradlew || true
+          ./gradlew assembleRelease --no-daemon
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: LML-XTREND-AGI-FINAL
           path: app/build/outputs/apk/release/*.apk
-
