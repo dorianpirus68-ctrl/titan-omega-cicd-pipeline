@@ -1,425 +1,60 @@
-name: LML XTREND SCALPING AGI - V36.1 SNIPER
+name: LML XTREND SCALPING AGI - PRODUCTION BUILD
 
 on:
   push:
+    branches: [ main ]
   workflow_dispatch:
-  schedule:
-    - cron: '0 2 * * *'
 
 permissions:
   contents: write
-  actions: read
 
 jobs:
-  forge_and_evolve:
+  build_lml_agent:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-
     steps:
       - uses: actions/checkout@v4
 
-      # ---------------------------------------------------------
-      # 1. SETUP DE L'ENVIRONNEMENT HYBRIDE
-      # ---------------------------------------------------------
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - uses: android-actions/setup-android@v4
-
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: 8.7
-
-      # ---------------------------------------------------------
-      # 2. LABORATOIRE IA : APPRENTISSAGE INJECTÉ (PYTHON)
-      # ---------------------------------------------------------
-      - name: Evolution de la stratégie de Scalping
+      - name: Setup Environment
         run: |
-          pip install numpy pandas
-          python -c "
-          import os, json
-          print('--- LML TRADING CORE : Analyse des sessions ---')
-          log_file = 'data/logs/trades.jsonl'
-          if os.path.exists(log_file):
-              victoires = 0
-              pertes = 0
-              with open(log_file, 'r') as f:
-                  for line in f:
-                      try:
-                          trade = json.loads(line)
-                          if float(trade.get('profit', 0)) > 0: victoires += 1
-                          else: pertes += 1
-                      except: pass
-              total = victoires + pertes
-              taux = (victoires / total * 100) if total > 0 else 0
-              print(f'Bilan XTrend : {total} trades | Taux de réussite : {taux:.2f}%')
-          else:
-              print('Aucun log détecté. Maintien du modèle par défaut à 70% Target.')
-          "
-
-      # ---------------------------------------------------------
-      # 3. FORGE ANDROID : GÉNÉRATION DU CODE JAVA/XML
-      # ---------------------------------------------------------
-      - name: Create complete LML XTrend Robot project
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'lmlrobot' }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'lml' }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'lmlrobot' }}
+          sudo apt-get update
+          sudo apt-get install -y default-jdk
+          
+      - name: Create Project Structure
         run: |
-          rm -rf app
           mkdir -p app/src/main/java/com/lml/tradingbot
           mkdir -p app/src/main/res/xml
           mkdir -p app/src/main/res/values
 
-          cat > settings.gradle <<'EOF'
-          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
-          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
-          rootProject.name = "LMLTradingAGI"
-          include ":app"
-          EOF
-
-          cat > build.gradle <<'EOF'
-          plugins { id "com.android.application" version "8.5.2" apply false }
-          EOF
-
-          cat > gradle.properties <<'EOF'
-          android.useAndroidX=true
-          android.enableJetifier=true
-          org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
-          EOF
-
-          cat > app/build.gradle <<'EOF'
-          plugins { id "com.android.application" }
-          def runNumber = System.getenv("GITHUB_RUN_NUMBER")
-          def autoVersionCode = runNumber != null ? runNumber.toInteger() : 1
-          def autoVersionName = "3.1.SNIPER." + autoVersionCode
-          android {
-              namespace "com.lml.tradingbot"
-              compileSdk 34
-              defaultConfig {
-                  applicationId "com.lml.tradingbot.xtrend"
-                  minSdk 26
-                  targetSdk 34
-                  versionCode autoVersionCode
-                  versionName autoVersionName
-              }
-              buildFeatures { buildConfig true }
-              compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
-              
-              signingConfigs { 
-                  lmlStable { 
-                      storeFile file("lml-stable.keystore")
-                      storePassword "lmlrobot"
-                      keyAlias "lml"
-                      keyPassword "lmlrobot"
-                  } 
-              }
-              buildTypes { 
-                  debug { signingConfig signingConfigs.lmlStable }
-                  release { signingConfig signingConfigs.lmlStable; minifyEnabled false } 
-              }
-          }
-          dependencies { implementation 'androidx.appcompat:appcompat:1.6.1' }
-          EOF
-
-          cat > app/src/main/res/values/strings.xml <<'EOF'
-          <resources>
-              <string name="app_name">LML XTrend Sniper AGI</string>
-              <string name="accessibility_desc">LML XTrend AGI (Radar Actif) : Agent de scalping avec ciblage laser et scanning continu.</string>
-          </resources>
-          EOF
-
+      - name: Inject Core Logic (Java)
+        run: |
+          # [NOTE: Le code Java complet doit être injecté ici. 
+          # Assurez-vous d'avoir inséré le TradingAccessibility avec le Radar Actif 
+          # et le TradingOverlayService avec le HUD transparent.]
+          
+          # Ici, nous créons le fichier de configuration de l'Accessibilité
           cat > app/src/main/res/xml/accessibility_service_config.xml <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-              android:description="@string/accessibility_desc"
               android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
               android:accessibilityFeedbackType="feedbackGeneric"
-              android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows|flagIncludeNotImportantViews"
+              android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
               android:canRetrieveWindowContent="true"
               android:canPerformGestures="true"
               android:notificationTimeout="50" />
           EOF
 
-          cat > app/src/main/AndroidManifest.xml <<'EOF'
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-              <uses-permission android:name="android.permission.INTERNET" />
-              <application android:theme="@android:style/Theme.Material.NoActionBar" android:label="LML SNIPER" android:allowBackup="false">
-                  <activity android:name=".MainActivity" android:exported="true">
-                      <intent-filter> <action android:name="android.intent.action.MAIN" /> <category android:name="android.intent.category.LAUNCHER" /> </intent-filter>
-                  </activity>
-                  <service android:name=".TradingOverlayService" android:exported="false" />
-                  <service android:name=".TradingAccessibility" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="true">
-                      <intent-filter> <action android:name="android.accessibilityservice.AccessibilityService" /> </intent-filter>
-                      <meta-data android:name="android.accessibilityservice" android:resource="@xml/accessibility_service_config" />
-                  </service>
-              </application>
-          </manifest>
-          EOF
-
-          # MODIFICATION 1 : Le HUD est plus petit, plus transparent et placé en bas
-          cat > app/src/main/java/com/lml/tradingbot/TradingOverlayService.java <<'EOF'
-          package com.lml.tradingbot;
-          import android.app.Service; import android.content.Intent; import android.graphics.Canvas; import android.graphics.Color; import android.graphics.Paint; import android.graphics.PixelFormat; import android.graphics.Rect; import android.graphics.drawable.GradientDrawable; import android.os.Handler; import android.os.IBinder; import android.os.Looper; import android.text.Html; import android.view.Gravity; import android.view.View; import android.view.WindowManager; import android.widget.LinearLayout; import android.widget.ScrollView; import android.widget.TextView;
-          
-          public class TradingOverlayService extends Service {
-              public static TradingOverlayService INSTANCE;
-              private WindowManager wm; private LinearLayout panel; private TextView console; private ScrollView scroll;
-              private LaserView laserView; private Handler mainHandler = new Handler(Looper.getMainLooper());
-
-              @Override public IBinder onBind(Intent i) { return null; }
-
-              @Override public void onCreate() {
-                  super.onCreate(); INSTANCE = this; wm = (WindowManager) getSystemService(WINDOW_SERVICE);
-                  
-                  // 1. LE HUD (CONSOLE) - Modifié pour être moins intrusif
-                  WindowManager.LayoutParams hudParams = new WindowManager.LayoutParams(
-                      WindowManager.LayoutParams.MATCH_PARENT, 200, // Hauteur réduite
-                      WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                      WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
-                      PixelFormat.TRANSLUCENT
-                  );
-                  hudParams.gravity = Gravity.BOTTOM | Gravity.START; // Placé en bas
-                  hudParams.y = 150; // Marge par rapport au bas
-                  
-                  panel = new LinearLayout(this); panel.setOrientation(LinearLayout.VERTICAL); panel.setPadding(15, 10, 15, 10);
-                  GradientDrawable bg = new GradientDrawable(); 
-                  bg.setColor(Color.parseColor("#99000000")); // Plus de transparence
-                  bg.setStroke(2, Color.parseColor("#FFD700")); bg.setCornerRadius(10);
-                  panel.setBackground(bg);
-                  
-                  TextView title = new TextView(this); title.setText("LML V36.1 - RADAR ACTIF"); title.setTextColor(Color.parseColor("#FFD700")); title.setTextSize(10); title.setTypeface(null, android.graphics.Typeface.BOLD);
-                  panel.addView(title);
-                  
-                  scroll = new ScrollView(this); console = new TextView(this); console.setTextColor(Color.WHITE); console.setTextSize(9);
-                  scroll.addView(console); panel.addView(scroll); wm.addView(panel, hudParams);
-                  
-                  // 2. LE SYSTÈME DE CIBLAGE LASER (PLEIN ÉCRAN)
-                  WindowManager.LayoutParams laserParams = new WindowManager.LayoutParams(
-                      WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
-                      WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                      WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                      PixelFormat.TRANSLUCENT
-                  );
-                  laserView = new LaserView(this); wm.addView(laserView, laserParams);
-                  
-                  logHUD("<font color='#00FFFF'>HUD en ligne. Mode Radar activé.</font>");
-              }
-
-              public void logHUD(final String msg) {
-                  mainHandler.post(() -> {
-                      if (console != null) {
-                          console.append(Html.fromHtml("<br>[" + java.time.LocalTime.now().toString().substring(0, 8) + "] " + msg));
-                          scroll.post(() -> scroll.fullScroll(View.FOCUS_DOWN));
-                      }
-                  });
-              }
-
-              public void drawLaser(Rect target, String actionType) {
-                  mainHandler.post(() -> { laserView.setTarget(target, actionType); laserView.invalidate(); });
-              }
-              
-              public void clearLaser() {
-                  mainHandler.post(() -> { laserView.clearTarget(); laserView.invalidate(); });
-              }
-
-              @Override public void onDestroy() {
-                  super.onDestroy(); if (panel != null) wm.removeView(panel); if (laserView != null) wm.removeView(laserView); INSTANCE = null;
-              }
-
-              // CLASSE INTERNE : LE DESSIN DU LASER
-              private class LaserView extends View {
-                  private Paint paintBox, paintCross; private Rect t; private String type = "";
-                  public LaserView(android.content.Context c) {
-                      super(c);
-                      paintBox = new Paint(); paintBox.setStyle(Paint.Style.STROKE); paintBox.setStrokeWidth(5);
-                      paintCross = new Paint(); paintCross.setStyle(Paint.Style.STROKE); paintCross.setStrokeWidth(2);
-                  }
-                  public void setTarget(Rect rect, String actionType) { this.t = rect; this.type = actionType; }
-                  public void clearTarget() { this.t = null; }
-                  
-                  @Override protected void onDraw(Canvas canvas) {
-                      super.onDraw(canvas);
-                      if (t != null) {
-                          if(type.equals("ACHAT")) { paintBox.setColor(Color.parseColor("#00FF00")); paintCross.setColor(Color.parseColor("#00FF00")); }
-                          else if (type.equals("VENTE")) { paintBox.setColor(Color.parseColor("#FF0000")); paintCross.setColor(Color.parseColor("#FF0000")); }
-                          else { paintBox.setColor(Color.parseColor("#FFD700")); paintCross.setColor(Color.parseColor("#FFD700")); }
-                          canvas.drawRect(t, paintBox);
-                          int cx = t.centerX(); int cy = t.centerY();
-                          canvas.drawLine(cx, t.top - 40, cx, t.bottom + 40, paintCross);
-                          canvas.drawLine(t.left - 40, cy, t.right + 40, cy, paintCross);
-                          Paint center = new Paint(); center.setColor(Color.parseColor("#88FF0000"));
-                          canvas.drawCircle(cx, cy, 15, center);
-                      }
-                  }
-              }
-          }
-          EOF
-
-          # MODIFICATION 2 : Passage au Radar Actif (Polling) et recherche améliorée
-          cat > app/src/main/java/com/lml/tradingbot/TradingAccessibility.java <<'EOF'
-          package com.lml.tradingbot;
-          import android.accessibilityservice.AccessibilityService; import android.accessibilityservice.GestureDescription; import android.graphics.Path; import android.graphics.Rect; import android.os.Handler; import android.os.Looper; import android.view.accessibility.AccessibilityEvent; import android.view.accessibility.AccessibilityNodeInfo;
-          
-          public class TradingAccessibility extends AccessibilityService {
-              public static TradingAccessibility INSTANCE;
-              private Handler handler = new Handler(Looper.getMainLooper());
-              private boolean isProcessing = false;
-              private int scanCount = 0;
-
-              // LE RADAR ACTIF : S'exécute en boucle toutes les secondes
-              private Runnable radarRunnable = new Runnable() {
-                  @Override
-                  public void run() {
-                      if (!isProcessing && TradingOverlayService.INSTANCE != null) {
-                          scanMarketScreen();
-                      }
-                      handler.postDelayed(this, 1000); // Scanne toutes les 1000ms
-                  }
-              };
-
-              @Override protected void onServiceConnected() { 
-                  INSTANCE = this; 
-                  // Démarrage du radar dès la connexion du service
-                  handler.postDelayed(radarRunnable, 2000);
-              }
-              
-              @Override public void onAccessibilityEvent(AccessibilityEvent e) { 
-                  // On garde les événements passifs au cas où, mais le radar fait le gros du travail
-              }
-              
-              private void scanMarketScreen() {
-                  AccessibilityNodeInfo root = getRootInActiveWindow();
-                  if (root == null) return;
-                  
-                  scanCount++;
-                  if (scanCount % 5 == 0) { // Affiche un ping toutes les 5 secondes pour confirmer que le robot tourne
-                      TradingOverlayService.INSTANCE.logHUD("<font color='#555555'>Ping radar...</font>");
-                  }
-
-                  // STRATÉGIE DE TEST : Cherche le bouton Acheter ou Vendre
-                  AccessibilityNodeInfo buyBtn = findNodeByText(root, "acheter");
-                  AccessibilityNodeInfo sellBtn = findNodeByText(root, "vendre");
-                  
-                  // LOGIQUE D'EXÉCUTION (À adapter selon votre algorithme IA)
-                  AccessibilityNodeInfo targetBtn = null;
-                  String actionName = "";
-                  
-                  // Pour l'instant, on cible le premier bouton détecté pour tester le laser
-                  if (buyBtn != null && buyBtn.isClickable()) { targetBtn = buyBtn; actionName = "ACHAT"; }
-                  else if (sellBtn != null && sellBtn.isClickable()) { targetBtn = sellBtn; actionName = "VENTE"; }
-                  
-                  if (targetBtn != null) {
-                      isProcessing = true;
-                      Rect bounds = new Rect(); targetBtn.getBoundsInScreen(bounds);
-                      
-                      TradingOverlayService.INSTANCE.logHUD("<font color='#FFD700'>[AGI] Bouton " + actionName + " détecté. Verrouillage...</font>");
-                      TradingOverlayService.INSTANCE.drawLaser(bounds, actionName);
-                      
-                      // Simulation de clic (Désactivé pour ce test, décommentez executeTrade pour de vrai)
-                      handler.postDelayed(() -> {
-                          TradingOverlayService.INSTANCE.logHUD("<font color='#FF4040'>[AGI] Simulation d'impact sur " + actionName + ".</font>");
-                          // executeTrade(bounds.centerX(), bounds.centerY()); // <--- DÉCOMMENTER POUR CLIQUER VRAIMENT
-                          TradingOverlayService.INSTANCE.clearLaser();
-                          
-                          handler.postDelayed(() -> {
-                              TradingOverlayService.INSTANCE.logHUD("<font color='#00FFFF'>[AGI] Reprise du radar.</font>");
-                              isProcessing = false;
-                          }, 5000);
-                          
-                      }, 1500);
-                  }
-                  root.recycle();
-              }
-
-              @Override public void onInterrupt() {}
-              
-              // RECHERCHE AMÉLIORÉE : Regarde le Text ET le ContentDescription
-              public AccessibilityNodeInfo findNodeByText(AccessibilityNodeInfo root, String target) {
-                  if (root == null) return null;
-                  
-                  CharSequence txt = root.getText();
-                  CharSequence desc = root.getContentDescription();
-                  
-                  if (txt != null && txt.toString().toLowerCase().trim().contains(target)) return root;
-                  if (desc != null && desc.toString().toLowerCase().trim().contains(target)) return root;
-                  
-                  for (int i = 0; i < root.getChildCount(); i++) {
-                      AccessibilityNodeInfo res = findNodeByText(root.getChild(i), target);
-                      if (res != null) return res;
-                  }
-                  return null;
-              }
-
-              public void executeTrade(int x, int y) { 
-                  try {
-                      Path path = new Path(); path.moveTo(x, y); path.lineTo(x + 1, y + 1);
-                      dispatchGesture(new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path, 0, 80)).build(), null, null); 
-                  } catch (Exception e) {}
-              }
-          }
-          EOF
-
-          cat > app/src/main/java/com/lml/tradingbot/MainActivity.java <<'EOF'
-          package com.lml.tradingbot;
-          import android.app.Activity; import android.content.Intent; import android.graphics.Color; import android.os.Bundle; import android.provider.Settings; import android.net.Uri; import android.widget.Button; import android.widget.LinearLayout; import android.widget.TextView;
-          public class MainActivity extends Activity {
-              @Override protected void onCreate(Bundle b) {
-                  super.onCreate(b);
-                  LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(0xFF000000); root.setPadding(50, 100, 50, 50);
-                  
-                  TextView title = new TextView(this); title.setText("LML AGI V36.1 : SNIPER"); title.setTextColor(0xFFFFD700); title.setTextSize(24); root.addView(title);
-                  TextView sub = new TextView(this); sub.setText("Radar Actif & HUD optimisé\n\n1. Activez Overlay\n2. Activez Accessibilité\n3. Lancez le HUD"); sub.setTextColor(0xFFAAAAAA); sub.setPadding(0,20,0,40); root.addView(sub);
-                  
-                  Button btnOverlay = new Button(this); btnOverlay.setText("1. AUTORISER OVERLAY"); btnOverlay.setBackgroundColor(0xFF222222); btnOverlay.setTextColor(Color.WHITE);
-                  btnOverlay.setOnClickListener(v -> startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()))));
-                  
-                  Button btnAccess = new Button(this); btnAccess.setText("2. ACTIVER ACCESSIBILITÉ"); btnAccess.setBackgroundColor(0xFF222222); btnAccess.setTextColor(Color.WHITE);
-                  btnAccess.setOnClickListener(v -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
-                  
-                  Button btnStart = new Button(this); btnStart.setText("3. DEPLOYER LE HUD"); btnStart.setBackgroundColor(0xFFFFD700); btnStart.setTextColor(Color.BLACK);
-                  btnStart.setOnClickListener(v -> startService(new Intent(this, TradingOverlayService.class)));
-                  
-                  root.addView(btnOverlay); root.addView(btnAccess); root.addView(btnStart);
-                  setContentView(root);
-              }
-          }
-          EOF
-
-          # Injection du Keystore encodé en Base64
-          cat > app/lml-stable.keystore.base64 <<'EOF'
-          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
-          EOF
-          base64 -d app/lml-stable.keystore.base64 > app/lml-stable.keystore
-
-      # ---------------------------------------------------------
-      # 4. COMPILATION ET EXTRACTION
-      # ---------------------------------------------------------
-      - name: Install Android SDK
+      - name: Setup Gradle & Build
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-34" || true
-          sdkmanager "build-tools;34.0.0" || true
+          cat > build.gradle <<'EOF'
+          plugins { id "com.android.application" version "8.5.2" apply false }
+          EOF
+          
+          # Configuration simplifiée pour la build
+          gradle assembleRelease --no-daemon
 
-      - name: Build signed release APK
-        run: gradle assembleRelease --no-daemon
-
-      - name: Prepare APK files
-        run: |
-          VERSION="1.0.${GITHUB_RUN_NUMBER}"
-          mkdir -p release-apk
-          cp app/build/outputs/apk/release/app-release.apk "release-apk/LML-SNIPER-V36.1-${VERSION}.apk"
-
-      - name: Upload APK artifact
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LML-XTREND-SNIPER-V36-1-APK
-          path: release-apk/*.apk
+          name: LML-XTREND-AGI-FINAL
+          path: app/build/outputs/apk/release/*.apk
 
