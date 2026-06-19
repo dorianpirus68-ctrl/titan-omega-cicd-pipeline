@@ -61,8 +61,12 @@ jobs:
               compileSdk 34
               defaultConfig { applicationId "com.lml.robotai.omega"; minSdk 26; targetSdk 34; versionCode autoVersionCode; versionName "OMEGA.40." + autoVersionCode }
               compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
-              signingConfigs { lmlStable { storeFile file("lml-stable.keystore"); storePassword "lmlrobot"; keyAlias "lml"; keyPassword "lmlrobot" } }
-              buildTypes { release { signingConfig signingConfigs.lmlStable; minifyEnabled false } }
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                      // Signing disabled for easy first builds (debug key used)
+                  }
+              }
           }
           dependencies { implementation 'androidx.appcompat:appcompat:1.6.1'; implementation 'androidx.core:core-ktx:1.12.0' }
           EOF
@@ -257,35 +261,32 @@ jobs:
           }
           EOF
 
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/lml-stable.keystore || true
-
-          # Generate Gradle wrapper so ./gradlew works reliably
+          # Generate Gradle wrapper
           gradle wrapper --gradle-version 8.7 --distribution-type bin
 
-      - name: 🔨 Compilation TITAN OMEGA
-        run: ./gradlew assembleRelease --no-daemon
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'lmlrobot' }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'lml' }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'lmlrobot' }}
+      - name: 🔨 Compilation TITAN OMEGA (Debug - sans keystore)
+        run: ./gradlew assembleDebug --no-daemon
 
       - name: 📦 Préparation de l'Artefact Release
         run: |
           VERSION="40.${GITHUB_RUN_NUMBER}"
-          mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/LML-TITAN-OMEGA-v${VERSION}.apk || true
+          mkdir -p app/build/outputs/apk/debug
+          mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/LML-TITAN-OMEGA-v${VERSION}-debug.apk || true
 
       - name: 🚀 Déploiement Automatique (GitHub Release)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: OMEGA-v40.${GITHUB_RUN_NUMBER}
-          name: TITAN OMEGA v40.${GITHUB_RUN_NUMBER}
+          name: TITAN OMEGA v40.${GITHUB_RUN_NUMBER} (Debug)
           body: |
-            ### 🚀 LML TITAN OMEGA DEPLOYED
+            ### 🚀 LML TITAN OMEGA DEPLOYED (Debug build - no keystore required)
+            - Build Debug pour installation facile sans keystore.
             - Moteur AGI `DecisionEngine` intégré.
-            - Furtivité `Humanizer` (Bezier & Jitter) activée.
-            - Pont `GeminiBridge` (Zero API Cost) fonctionnel.
-            - `WakeLock` & `ForegroundService` : Immunité système.
-            - Apprentissage par imitation `Muscle Memory`.
-          files: app/build/outputs/apk/release/*.apk
+            - Furtivité `Humanizer` activée.
+            - Pont `GeminiBridge` fonctionnel.
+            - Apprentissage par imitation.
+            
+            **Note** : Pour une version Release signée, ajoute le secret KEYSTORE_BASE64 plus tard.
+          files: app/build/outputs/apk/debug/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
