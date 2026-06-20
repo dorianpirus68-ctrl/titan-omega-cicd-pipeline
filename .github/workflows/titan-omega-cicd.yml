@@ -13,7 +13,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
@@ -30,6 +30,10 @@ jobs:
           gradle-version: 8.7
 
       - name: Create complete LML Robot AI V42 project
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'lmlrobot' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'lml' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'lmlrobot' }}
         run: |
           rm -rf app
           mkdir -p app/src/main/java/com/lml/robotai
@@ -51,11 +55,17 @@ jobs:
           EOF
 
           cat > gradle.properties <<'EOF'
-          org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          android.enableJetifier=true
+          org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8
           EOF
 
+          # CORRECTIF CRITIQUE : Securisation du "toInteger()" qui faisait crasher Gradle
           cat > app/build.gradle <<'EOF'
           plugins { id "com.android.application" }
+          def runNumber = System.getenv("GITHUB_RUN_NUMBER")
+          def autoVersionCode = (runNumber != null && !runNumber.trim().isEmpty()) ? runNumber.toInteger() : 1
+          def autoVersionName = "1.0." + autoVersionCode
           android {
               namespace "com.lml.robotai"
               compileSdk 34
@@ -63,12 +73,17 @@ jobs:
                   applicationId "com.lml.robotai.v42"
                   minSdk 26
                   targetSdk 34
-                  versionCode 1
-                  versionName "1.0"
+                  versionCode autoVersionCode
+                  versionName autoVersionName
               }
               buildFeatures { buildConfig true }
               compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
-              lint { abortOnError false; checkReleaseBuilds false }
+              
+              lint {
+                  abortOnError false
+                  checkReleaseBuilds false
+              }
+              
               signingConfigs { 
                   lmlStable { 
                       storeFile file("lml-stable.keystore")
@@ -82,7 +97,7 @@ jobs:
               }
           }
           dependencies {
-              // 100% Natif. Aucune dépendance externe requise. Anti-crash CI.
+              implementation 'androidx.appcompat:appcompat:1.6.1'
           }
           EOF
 
@@ -875,7 +890,9 @@ jobs:
 
       - name: Build signed release APK
         run: |
-          ./gradlew assembleRelease --no-daemon --info --stacktrace
+          gradle wrapper --gradle-version 8.7
+          chmod +x gradlew
+          ./gradlew assembleRelease --stacktrace --info
 
       - name: Prepare APK files
         run: |
