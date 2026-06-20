@@ -13,7 +13,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -30,10 +30,6 @@ jobs:
           gradle-version: 8.7
 
       - name: Create complete LML Robot AI V42 project
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'lmlrobot' }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'lml' }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'lmlrobot' }}
         run: |
           rm -rf app
           mkdir -p app/src/main/java/com/lml/robotai
@@ -55,16 +51,11 @@ jobs:
           EOF
 
           cat > gradle.properties <<'EOF'
-          android.useAndroidX=true
-          android.enableJetifier=true
-          org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8
+          org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
           EOF
 
           cat > app/build.gradle <<'EOF'
           plugins { id "com.android.application" }
-          def runNumber = System.getenv("GITHUB_RUN_NUMBER")
-          def autoVersionCode = runNumber != null ? runNumber.toInteger() : 1
-          def autoVersionName = "1.0." + autoVersionCode
           android {
               namespace "com.lml.robotai"
               compileSdk 34
@@ -72,17 +63,12 @@ jobs:
                   applicationId "com.lml.robotai.v42"
                   minSdk 26
                   targetSdk 34
-                  versionCode autoVersionCode
-                  versionName autoVersionName
+                  versionCode 1
+                  versionName "1.0"
               }
               buildFeatures { buildConfig true }
               compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
-              
-              lint {
-                  abortOnError false
-                  checkReleaseBuilds false
-              }
-              
+              lint { abortOnError false; checkReleaseBuilds false }
               signingConfigs { 
                   lmlStable { 
                       storeFile file("lml-stable.keystore")
@@ -92,12 +78,11 @@ jobs:
                   } 
               }
               buildTypes { 
-                  debug { signingConfig signingConfigs.lmlStable }
                   release { signingConfig signingConfigs.lmlStable; minifyEnabled false } 
               }
           }
           dependencies {
-              implementation 'androidx.appcompat:appcompat:1.6.1'
+              // 100% Natif. Aucune dépendance externe requise. Anti-crash CI.
           }
           EOF
 
@@ -123,7 +108,7 @@ jobs:
 
           cat > app/src/main/AndroidManifest.xml <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.lml.robotai">
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -217,25 +202,20 @@ jobs:
           cat > app/src/main/java/com/lml/robotai/AgiNetworkManager.java <<'EOF'
           package com.lml.robotai;
           import java.io.BufferedReader; import java.io.InputStreamReader; import java.io.OutputStream; import java.net.HttpURLConnection; import java.net.URL; import java.util.concurrent.ExecutorService; import java.util.concurrent.Executors;
-          
           public class AgiNetworkManager {
               private final ExecutorService executor = Executors.newSingleThreadExecutor();
               private final String API_KEY = "TA_CLE_API_GEMINI_ICI"; 
               private final String ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=";
-
               public interface LlmCallback { void onResponse(String answer, boolean success); }
-              
               public void sendPrompt(String systemContext, String userPrompt, LlmCallback cb) {
                   executor.execute(() -> {
                       try {
                           URL url = new URL(ENDPOINT + API_KEY); HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                           conn.setRequestMethod("POST"); conn.setRequestProperty("Content-Type", "application/json"); conn.setDoOutput(true);
-                          
                           String safeSys = systemContext.replace("\"", "\\\"").replace("\n", " "); 
                           String safePrompt = userPrompt.replace("\"", "\\\"").replace("\n", " ");
                           String combinedPrompt = safeSys + " | INSTRUCTION: " + safePrompt;
                           String payload = "{\"contents\":[{\"parts\":[{\"text\":\"" + combinedPrompt + "\"}]}]}";
-                          
                           try(OutputStream os = conn.getOutputStream()) { byte[] input = payload.getBytes("utf-8"); os.write(input, 0, input.length); }
                           if (conn.getResponseCode() == 200) {
                               BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8")); StringBuilder resp = new StringBuilder(); String line;
@@ -256,7 +236,6 @@ jobs:
           public class GithubUplink {
               private static final String GH_TOKEN = "TON_TOKEN_GITHUB_ICI";
               private static final String REPO = "TonPseudo/TonRepo";
-              
               public static void triggerBuild(String newFeatureLog) {
                   Executors.newSingleThreadExecutor().execute(() -> {
                       try {
@@ -564,7 +543,7 @@ jobs:
               private void setupControlPanel() {
                   panel = new LinearLayout(this); panel.setOrientation(LinearLayout.VERTICAL); panel.setPadding(15,15,15,15); panel.setBackground(bg(theme.getBgColor(), theme.getMainColor(), 25));
                   LinearLayout header = new LinearLayout(this); header.setOrientation(LinearLayout.HORIZONTAL);
-                  TextView title = new TextView(this); title.setText("V42 TITAN PHOENIX"); title.setTextColor(theme.getMainColor()); title.setTextSize(13); title.setTypeface(null, android.graphics.Typeface.BOLD); header.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+                  TextView title = new TextView(this); title.setText("V42 TITAN PHOENIX"); title.setTextColor(theme.getMainColor()); title.setTextSize(13); title.setTypeface(null, android.graphics.Typeface.BOLD); header.addView(title, new LinearLayout.LayoutParams(0, -2, 1.0f));
                   
                   header.addView(btn("STOP", Color.RED, v -> triggerPanic()), new LinearLayout.LayoutParams(80, -2)); 
                   header.addView(btn("-", Color.WHITE, v -> togglePanel()), new LinearLayout.LayoutParams(80, -2)); 
@@ -575,7 +554,7 @@ jobs:
                   LinearLayout chatBar = new LinearLayout(this); chatBar.setOrientation(LinearLayout.HORIZONTAL); chatBar.setTag("ui"); chatBar.setPadding(0, 10, 0, 0);
                   chatInput = new EditText(this); chatInput.setHint("Demande moi d'agir..."); chatInput.setTextColor(Color.WHITE); chatInput.setHintTextColor(Color.parseColor("#666666")); chatInput.setBackground(bg(Color.parseColor("#111111"), theme.getMainColor(), 10));
                   chatInput.setOnTouchListener((v, e) -> { if (e.getAction() == MotionEvent.ACTION_UP) forceKeyboard(); return false; });
-                  chatBar.addView(chatInput, new LinearLayout.LayoutParams(0, -2, 1));
+                  chatBar.addView(chatInput, new LinearLayout.LayoutParams(0, -2, 1.0f));
                   chatBar.addView(btn("ENVOYER", theme.getMainColor(), v -> parseAndRun()), new LinearLayout.LayoutParams(120, -2));
                   panel.addView(chatBar);
 
@@ -583,14 +562,14 @@ jobs:
                   pp.gravity = Gravity.TOP | Gravity.START; pp.x = 20; pp.y = 100;
                   panel.setOnTouchListener((v,e)->{ if(e.getAction()==MotionEvent.ACTION_DOWN) { px=pp.x; py=pp.y; dx=e.getRawX(); dy=e.getRawY(); return false; } if(e.getAction()==MotionEvent.ACTION_MOVE) { pp.x=px+(int)(e.getRawX()-dx); pp.y=py+(int)(e.getRawY()-dy); wm.updateViewLayout(panel,pp); return false; } return false; });
                   wm.addView(panel, pp); updatePanelVisibility();
-                  chatLog("<font color='#00FFFF'><b>TITAN:</b> Systeme PHOENIX pret. Mouvement Anti-Bot active. Tape 'observe moi' pour m'apprendre des actions.</font>");
+                  chatLog("<font color='#00FFFF'>[SYS] Systeme PHOENIX pret. Mouvement Anti-Bot active. Tape 'observe moi' pour m'apprendre des actions.</font>");
               }
               
               private void triggerPanic() {
                   isEmergencyStop = true; mainHandler.removeCallbacksAndMessages(null); pendingSnapDeletes.clear(); 
                   agentGoal = null; agentHistory.clear(); SafetyGuard.bypassForSafeMode = false; LearningEngine.isRecording = false;
                   robot.setVisibility(android.view.View.GONE); map.setVisibility(android.view.View.GONE);
-                  chatLog("<font color='#FF0000'><b>[TITAN]: ARRET D'URGENCE COMPLET.</b></font>"); Toast.makeText(this, "TITAN: STOP", Toast.LENGTH_SHORT).show(); startLoops();
+                  chatLog("<font color='#FF0000'>[SYS] ARRET D'URGENCE COMPLET.</font>"); Toast.makeText(this, "TITAN: STOP", Toast.LENGTH_SHORT).show(); startLoops();
               }
 
               private void togglePanel() { minimized = !minimized; WindowManager.LayoutParams pp = (WindowManager.LayoutParams) panel.getLayoutParams(); if (!minimized) { pp.flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE; pp.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL; } else { pp.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE; hideKeyboard(); map.setVisibility(android.view.View.GONE); robot.setVisibility(android.view.View.GONE); map.setBoxes(false); } wm.updateViewLayout(panel, pp); updatePanelVisibility(); }
@@ -604,13 +583,13 @@ jobs:
                   isEmergencyStop = false;
                   String fullCmd = chatInput.getText().toString().trim(); if(fullCmd.isEmpty()) return; 
                   hideKeyboard(); chatInput.setText(""); robot.point(500, 500, "Reflexion");
-                  chatLog("<font color='#FFFFFF'><b>MOI:</b> " + fullCmd + "</font>");
+                  chatLog("<font color='#FFFFFF'>MOI: " + fullCmd + "</font>");
                   
                   String lcmd = fullCmd.toLowerCase();
                   
                   if (agentGoal != null && !lcmd.startsWith("auto") && !lcmd.startsWith("agent")) {
                       agentGoal = agentGoal + " (Note utilisateur: " + fullCmd + ")";
-                      chatLog("<font color='#9D00FF'>[TITAN]: Info recue, je continue en m'adaptant...</font>");
+                      chatLog("<font color='#9D00FF'>[IA] Info recue, je m'adapte...</font>");
                       runAgentLoop(); return;
                   }
 
@@ -620,7 +599,7 @@ jobs:
                   boolean isComplex = !lcmd.startsWith("clique") && !lcmd.startsWith("scroll") && !lcmd.startsWith("lance") && !lcmd.startsWith("recherche web") && !lcmd.startsWith("github") && !lcmd.contains(" puis ") && !lcmd.startsWith("preparer") && !lcmd.startsWith("valider") && !lcmd.startsWith("apprends") && !lcmd.contains("tiktok") && !lcmd.contains("observe moi") && !lcmd.startsWith("fin");
                   if (lcmd.startsWith("auto ") || lcmd.startsWith("agent ") || isComplex) {
                       agentGoal = fullCmd.replace("auto ", "").replace("agent ", "").trim(); agentHistory.clear();
-                      chatLog("<font color='#9D00FF'><b>[TITAN PHOENIX] Je prends le controle. Objectif : " + agentGoal + "</b></font>");
+                      chatLog("<font color='#9D00FF'>[IA] Je prends le controle. Objectif : " + agentGoal + "</font>");
                       runAgentLoop(); return;
                   }
 
@@ -639,7 +618,7 @@ jobs:
                   String memoire = skillManager.getSkill("REGLE_IA");
                   String reglesUtilisateur = (memoire != null && !memoire.isEmpty()) ? " REGLES PERSO: " + memoire : "";
 
-                  String prompt = "Tu es TITAN V42, une AGI auto-correctrice. Ton OBJECTIF est: '" + agentGoal + "'.\n" +
+                  String prompt = "Tu es TITAN V42. Ton OBJECTIF: '" + agentGoal + "'.\n" +
                                   "HISTORIQUE: " + hist + ".\n" + stuckWarning + reglesUtilisateur +
                                   "REGLES: 1) Utilise la Vision par ID (ex: clique id 5). 2) Auto-corrige-toi si bloque. " +
                                   "REPONDS STRICTEMENT DANS CE FORMAT:\n" +
@@ -649,7 +628,7 @@ jobs:
                   robot.setVisibility(android.view.View.VISIBLE);
                   networkManager.sendPrompt("SYSTEME", prompt, (answer, success) -> {
                       mainHandler.post(() -> {
-                          if (!success || isEmergencyStop) { agentGoal = null; robot.setVisibility(android.view.View.GONE); map.setVisibility(android.view.View.GONE); chatLog("<font color='#FF3333'><b>TITAN:</b> Erreur IA.</font>"); return; }
+                          if (!success || isEmergencyStop) { agentGoal = null; robot.setVisibility(android.view.View.GONE); map.setVisibility(android.view.View.GONE); chatLog("<font color='#FF3333'>[ERR] Erreur IA.</font>"); return; }
                           
                           String pensee = "Je reflechis..."; String commande = "done";
                           try {
@@ -660,13 +639,13 @@ jobs:
 
                           String nextCmd = commande.toLowerCase().replace("\n", "");
                           if (nextCmd.contains("done") || nextCmd.equals("fini")) { 
-                              chatLog("<font color='#00FF00'><b>TITAN:</b> Objectif Atteint. (" + pensee + ")</font>"); 
+                              chatLog("<font color='#00FF00'>[OK] Objectif Atteint. (" + pensee + ")</font>"); 
                               agentGoal = null; robot.setVisibility(android.view.View.GONE); map.setVisibility(android.view.View.GONE); 
                           } 
                           else { 
                               agentHistory.add(nextCmd); if(agentHistory.size() > 5) agentHistory.remove(0); 
-                              if(isStuck) chatLog("<font color='#FF6600'><i>Correction en cours...</i></font>");
-                              chatLog("<font color='#AAAAAA'><i>> " + pensee + "</i></font>"); 
+                              if(isStuck) chatLog("<font color='#FF6600'>[!] Correction en cours...</font>");
+                              chatLog("<font color='#AAAAAA'>" + pensee + "</font>"); 
                               List<String> steps = new ArrayList<>(); steps.add(nextCmd); executeStepsSequentially(steps, 0); 
                           }
                       });
@@ -706,7 +685,7 @@ jobs:
 
                   if (lcmd.equals("observe moi")) {
                       LearningEngine.start();
-                      chatLog("<font color='#FF0000'><b>[REC] Mode Apprentissage par Imitation active.</b></font><br>Je memorise tes actions. Quand tu as fini, tape 'fin [nom_de_la_sequence]'.");
+                      chatLog("<font color='#FF0000'>[REC] Apprentissage active. Je memorise tes clics. Tape 'fin [nom_skill]' pour sauvegarder.</font>");
                       return;
                   }
                   if (lcmd.startsWith("fin") && LearningEngine.isRecording) {
@@ -715,9 +694,9 @@ jobs:
                       String sequence = LearningEngine.stopAndGetSequence();
                       if (sequence != null) {
                           skillManager.saveSkill(nomSkill, sequence);
-                          chatLog("<font color='#00FF00'><b>[SAUVEGARDE]</b> Competence '" + nomSkill + "' apprise avec succes !</font>");
+                          chatLog("<font color='#00FF00'>[OK] Skill '" + nomSkill + "' appris !</font>");
                           chatLog("<font color='#AAAAAA'>Code: " + sequence + "</font>");
-                      } else { chatLog("<font color='#FF3333'>[ERR] Aucune action enregistree.</font>"); }
+                      } else { chatLog("<font color='#FF3333'>[ERR] Rien a enregistrer.</font>"); }
                       return;
                   }
 
@@ -725,23 +704,23 @@ jobs:
                       String nouvelleRegle = q.replace("retiens ", "").trim();
                       String reglesActuelles = skillManager.getSkill("REGLE_IA"); if (reglesActuelles == null) reglesActuelles = "";
                       skillManager.saveSkill("REGLE_IA", reglesActuelles + " - " + nouvelleRegle);
-                      chatLog("<font color='#00FF00'>[MEMOIRE] Nouvelle regle IA assimilee : " + nouvelleRegle + "</font>");
+                      chatLog("<font color='#00FF00'>[MEMOIRE] Regle IA ajoutee : " + nouvelleRegle + "</font>");
                       return;
                   }
                   
                   if (lcmd.contains("tiktok auto") || lcmd.contains("nettoyage tiktok") || lcmd.contains("farm tiktok")) {
-                      chatLog("<font color='#9D00FF'><b>[LML TIKTOK] SEQUENCE AUTO DEMARREE.</b></font>");
+                      chatLog("<font color='#9D00FF'>[LML] TIKTOK SCRIPT START.</font>");
                       SafetyGuard.bypassForSafeMode = true; panel.setVisibility(android.view.View.GONE); robot.setVisibility(android.view.View.VISIBLE); executeTiktokSequence(0); return;
                   }
                   
                   if (lcmd.startsWith("apprends ")) {
                       String[] parts = q.substring(9).split("=", 2);
-                      if (parts.length == 2) { skillManager.saveSkill(parts[0].trim(), parts[1].trim()); chatLog("<font color='#00FF00'>[AUTO-INJECTION] Skill '" + parts[0].trim() + "' enregistre !</font>"); } 
+                      if (parts.length == 2) { skillManager.saveSkill(parts[0].trim(), parts[1].trim()); chatLog("<font color='#00FF00'>[OK] Skill manuel enregistre.</font>"); } 
                       if(agentGoal != null) mainHandler.postDelayed(this::runAgentLoop, 2000); return;
                   }
                   if (lcmd.startsWith("github ")) {
                       String feature = q.replace("github ", "").replace("\"", "").replace("'", "").trim();
-                      GithubUplink.triggerBuild(feature); chatLog("<font color='#9D00FF'><b>[AUTO-EVOLUTION]</b> Demande envoyee a GitHub: " + feature + "</font>");
+                      GithubUplink.triggerBuild(feature); chatLog("<font color='#9D00FF'>[GITHUB] Requete envoyee.</font>");
                       if(agentGoal != null) mainHandler.postDelayed(this::runAgentLoop, 4000); return;
                   }
                   if (lcmd.contains("preparer") || lcmd.contains("prepare")) {
@@ -751,11 +730,11 @@ jobs:
                           if (!isExcluded && n.bounds.top > headerThreshold) { boolean alreadyAdded = false; for(ScreenNode p : pendingSnapDeletes) { if((p.text+" "+p.desc).trim().equals((n.text+" "+n.desc).trim())) { alreadyAdded = true; break; } } if(!alreadyAdded) { pendingSnapDeletes.add(n); String disp = n.text.isEmpty() ? n.desc : n.text; if(disp.length() > 25) disp = disp.substring(0, 25); sb.append("- ").append(disp).append("<br>"); } } 
                       }
                       if (pendingSnapDeletes.isEmpty()) { chatLog("<font color='#FF3333'>[SAFE] Aucun profil detecte.</font>"); map.setVisibility(android.view.View.GONE); return; }
-                      chatLog("<font color='#00FFFF'><b>[LML SAFE] FILE D'ATTENTE :</b></font><br>" + sb.toString()); mainHandler.postDelayed(() -> { map.setVisibility(android.view.View.GONE); }, 3000); return;
+                      chatLog("<font color='#00FFFF'>[SAFE] PROFIL DETECTE:</font><br>" + sb.toString()); mainHandler.postDelayed(() -> { map.setVisibility(android.view.View.GONE); }, 3000); return;
                   }
                   if (lcmd.contains("valider") || lcmd.contains("suppression") || lcmd.contains("supprimer")) {
                       if (pendingSnapDeletes.isEmpty()) { chatLog("<font color='#FF3333'>[SAFE] File d'attente vide.</font>"); return; }
-                      chatLog("<font color='#FF3333'><b>[LML SAFE] DEBUT DU NETTOYAGE. NE TOUCHEZ PLUS L'ECRAN.</b></font>"); SafetyGuard.bypassForSafeMode = true; panel.setVisibility(android.view.View.GONE); robot.setVisibility(android.view.View.GONE); map.setVisibility(android.view.View.GONE); executeSnapCleanSequence(0); return;
+                      chatLog("<font color='#FF3333'>[LML] DEBUT DU NETTOYAGE. NE TOUCHEZ PLUS L'ECRAN.</font>"); SafetyGuard.bypassForSafeMode = true; panel.setVisibility(android.view.View.GONE); robot.setVisibility(android.view.View.GONE); map.setVisibility(android.view.View.GONE); executeSnapCleanSequence(0); return;
                   }
 
                   robot.setVisibility(android.view.View.VISIBLE);
@@ -797,7 +776,7 @@ jobs:
                   }
                   String q = steps.get(index); int w = getResources().getDisplayMetrics().widthPixels; int h = getResources().getDisplayMetrics().heightPixels; int delay = 2000; 
                   
-                  if (q.startsWith("parle ")) { String msg = q.replace("parle ", "").replace("\"", "").replace("'", "").trim(); chatLog("<font color='#00FF00'><b>TITAN:</b> " + msg + "</font>"); robot.setVisibility(android.view.View.GONE); return; }
+                  if (q.startsWith("parle ")) { String msg = q.replace("parle ", "").replace("\"", "").replace("'", "").trim(); chatLog("<font color='#00FF00'>[SYS] " + msg + "</font>"); robot.setVisibility(android.view.View.GONE); return; }
                   else if (q.startsWith("recherche web ")) { String query = AgiIntentParser.extractQuoteArgument(q); if (query == null) query = q.replace("recherche web ", "").trim(); Intent intent = new Intent(Intent.ACTION_WEB_SEARCH); intent.putExtra(android.app.SearchManager.QUERY, query); intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(intent); delay = 4000; }
                   else if (q.startsWith("github ")) { String feature = q.replace("github ", "").replace("\"", "").replace("'", "").trim(); GithubUplink.triggerBuild(feature); delay = 4000;}
                   else if (q.startsWith("attends ") || q.startsWith("pause ")) { int seconds = 2; try { seconds = Integer.parseInt(q.replaceAll("[^0-9]", "")); } catch(Exception e){} delay = seconds * 1000; chatLog("Pause de " + seconds + "s..."); }
@@ -867,8 +846,8 @@ jobs:
                   
                   skillCard.addView(skillName); skillCard.addView(skillSeq);
                   LinearLayout skillBtns = new LinearLayout(this); skillBtns.setOrientation(LinearLayout.HORIZONTAL);
-                  skillBtns.addView(btn("SAVE", Color.parseColor("#9D00FF"), v -> { skillManager.saveSkill(skillName.getText().toString(), skillSeq.getText().toString()); skillName.setText(""); skillSeq.setText(""); updateList.run(); }), new LinearLayout.LayoutParams(0,-2,1));
-                  skillBtns.addView(btn("PURGER", Color.parseColor("#FF3333"), v -> { skillManager.clearSkills(); updateList.run(); }), new LinearLayout.LayoutParams(0,-2,1));
+                  skillBtns.addView(btn("SAVE", Color.parseColor("#9D00FF"), v -> { skillManager.saveSkill(skillName.getText().toString(), skillSeq.getText().toString()); skillName.setText(""); skillSeq.setText(""); updateList.run(); }), new LinearLayout.LayoutParams(0,-2,1.0f));
+                  skillBtns.addView(btn("PURGER", Color.parseColor("#FF3333"), v -> { skillManager.clearSkills(); updateList.run(); }), new LinearLayout.LayoutParams(0,-2,1.0f));
                   skillCard.addView(skillBtns); skillCard.addView(skillList);
                   root.addView(skillCard);
 
@@ -896,7 +875,7 @@ jobs:
 
       - name: Build signed release APK
         run: |
-          gradle assembleRelease --info --stacktrace
+          ./gradlew assembleRelease --no-daemon --info --stacktrace
 
       - name: Prepare APK files
         run: |
