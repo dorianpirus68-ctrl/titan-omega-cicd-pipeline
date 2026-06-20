@@ -96,7 +96,7 @@ jobs:
           cat > app/src/main/res/values/strings.xml <<'EOF'
           <resources>
               <string name="app_name">LML V42 PHOENIX</string>
-              <string name="accessibility_desc">LML AGI V42 : Auto-Correction, Apprentissage Humain, Nettoyage TikTok & Snap.</string>
+              <string name="accessibility_desc">LML AGI V42 : Auto-Correction, Apprentissage Humain, Nettoyage TikTok et Snap.</string>
           </resources>
           EOF
 
@@ -210,7 +210,7 @@ jobs:
           
           public class AgiNetworkManager {
               private final ExecutorService executor = Executors.newSingleThreadExecutor();
-              private final String API_KEY = "TA_CLE_API_GEMINI_ICI"; // Ou l'IP de ton PC si tu utilises Ollama (ex: http://192.168.1.X:11434/api/generate)
+              private final String API_KEY = "TA_CLE_API_GEMINI_ICI"; 
               private final String ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=";
 
               public interface LlmCallback { void onResponse(String answer, boolean success); }
@@ -270,7 +270,7 @@ jobs:
               public static String extractQuoteArgument(String command) { Matcher m = Pattern.compile("[\"'](.*?)[\"']").matcher(command); if (m.find()) return m.group(1); return null; }
               public static List<String> parseSequence(String rawCommand) {
                   List<String> steps = new ArrayList<>(); if (rawCommand == null || rawCommand.trim().isEmpty()) return steps;
-                  String[] parts = rawCommand.toLowerCase().split("\\bpनंतर\\b|\\bpuis\\b|\\bet\\b|\\bensuite\\b|\\baprès\\b");
+                  String[] parts = rawCommand.toLowerCase().split("\\bpuis\\b|\\bet\\b|\\bensuite\\b|\\baprès\\b");
                   for (String p : parts) { String clean = p.trim(); if (!clean.isEmpty()) steps.add(clean); } return steps;
               }
           }
@@ -695,7 +695,6 @@ jobs:
               private void executeCommand(String q) {
                   String lcmd = q.toLowerCase();
 
-                  // --- NOUVEAU : MODE APPRENTISSAGE PAR IMITATION ---
                   if (lcmd.equals("observe moi")) {
                       LearningEngine.start();
                       chatLog("<font color='#FF0000'><b>[REC] Mode Apprentissage par Imitation activé.</b></font><br>Je mémorise tes actions. Quand tu as fini, tape 'fin [nom_de_la_sequence]'.");
