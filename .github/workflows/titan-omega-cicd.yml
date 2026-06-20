@@ -40,6 +40,7 @@ jobs:
           mkdir -p app/src/main/res/xml
           mkdir -p app/src/main/res/values
 
+          # Generation securisee de la cle keystore
           keytool -genkeypair -v -keystore app/lml-stable.keystore -alias lml -keyalg RSA -keysize 2048 -validity 10000 -storepass lmlrobot -keypass lmlrobot -dname "CN=LML, OU=App, O=Brand, L=Paris, ST=IDF, C=FR"
 
           cat > settings.gradle <<'EOF'
@@ -56,7 +57,7 @@ jobs:
           cat > gradle.properties <<'EOF'
           android.useAndroidX=true
           android.enableJetifier=true
-          org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
+          org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8
           EOF
 
           cat > app/build.gradle <<'EOF'
@@ -95,9 +96,6 @@ jobs:
                   release { signingConfig signingConfigs.lmlStable; minifyEnabled false } 
               }
           }
-          tasks.withType(JavaCompile) {
-              options.encoding = "UTF-8"
-          }
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
           }
@@ -125,7 +123,7 @@ jobs:
 
           cat > app/src/main/AndroidManifest.xml <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.lml.robotai">
               <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -569,7 +567,7 @@ jobs:
                   TextView title = new TextView(this); title.setText("V42 TITAN PHOENIX"); title.setTextColor(theme.getMainColor()); title.setTextSize(13); title.setTypeface(null, android.graphics.Typeface.BOLD); header.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
                   
                   header.addView(btn("STOP", Color.RED, v -> triggerPanic()), new LinearLayout.LayoutParams(80, -2)); 
-                  header.addView(btn("—", Color.WHITE, v -> togglePanel()), new LinearLayout.LayoutParams(80, -2)); 
+                  header.addView(btn("-", Color.WHITE, v -> togglePanel()), new LinearLayout.LayoutParams(80, -2)); 
                   header.addView(btn("X", Color.parseColor("#FF3333"), v -> stopSelf()), new LinearLayout.LayoutParams(80, -2)); panel.addView(header);
                   
                   logScroll = new ScrollView(this); logScroll.setTag("ui"); report = new TextView(this); report.setTextColor(Color.parseColor("#CCCCCC")); report.setTextSize(12); logScroll.addView(report); panel.addView(logScroll, new LinearLayout.LayoutParams(-1, 400));
@@ -662,12 +660,12 @@ jobs:
 
                           String nextCmd = commande.toLowerCase().replace("\n", "");
                           if (nextCmd.contains("done") || nextCmd.equals("fini")) { 
-                              chatLog("<font color='#00FF00'><b>TITAN:</b> [OK] Objectif Atteint. (" + pensee + ")</font>"); 
+                              chatLog("<font color='#00FF00'><b>TITAN:</b> Objectif Atteint. (" + pensee + ")</font>"); 
                               agentGoal = null; robot.setVisibility(android.view.View.GONE); map.setVisibility(android.view.View.GONE); 
                           } 
                           else { 
                               agentHistory.add(nextCmd); if(agentHistory.size() > 5) agentHistory.remove(0); 
-                              if(isStuck) chatLog("<font color='#FF6600'><i>[!] Correction en cours...</i></font>");
+                              if(isStuck) chatLog("<font color='#FF6600'><i>Correction en cours...</i></font>");
                               chatLog("<font color='#AAAAAA'><i>> " + pensee + "</i></font>"); 
                               List<String> steps = new ArrayList<>(); steps.add(nextCmd); executeStepsSequentially(steps, 0); 
                           }
@@ -896,10 +894,9 @@ jobs:
           }
           EOF
 
-      - name: Compile with Gradle Wrapper
+      - name: Build signed release APK
         run: |
-          gradle wrapper --gradle-version 8.7
-          ./gradlew assembleRelease --no-daemon --stacktrace --info
+          gradle assembleRelease --info --stacktrace
 
       - name: Prepare APK files
         run: |
