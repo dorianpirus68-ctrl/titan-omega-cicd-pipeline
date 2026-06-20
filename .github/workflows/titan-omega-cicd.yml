@@ -40,7 +40,6 @@ jobs:
           mkdir -p app/src/main/res/xml
           mkdir -p app/src/main/res/values
 
-          # --- GENERATION DE LA CLE DE SECURITE EN DIRECT (ANTI-CRASH) ---
           keytool -genkeypair -v -keystore app/lml-stable.keystore -alias lml -keyalg RSA -keysize 2048 -validity 10000 -storepass lmlrobot -keypass lmlrobot -dname "CN=LML, OU=App, O=Brand, L=Paris, ST=IDF, C=FR"
 
           cat > settings.gradle <<'EOF'
@@ -95,6 +94,9 @@ jobs:
                   debug { signingConfig signingConfigs.lmlStable }
                   release { signingConfig signingConfigs.lmlStable; minifyEnabled false } 
               }
+          }
+          tasks.withType(JavaCompile) {
+              options.encoding = "UTF-8"
           }
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
@@ -342,14 +344,14 @@ jobs:
 
           cat > app/src/main/java/com/lml/robotai/RobotThemeManager.java <<'EOF'
           package com.lml.robotai;
-          import android.content.Context; import android.content.SharedPreferences;
+          import android.content.Context; import android.content.SharedPreferences; import android.graphics.Color;
           public class RobotThemeManager {
               private final SharedPreferences sp; public static final int THEME_NOIR_OR = 0; public static final int THEME_CYBER_VIOLET = 1; public static final int THEME_NEON_CYAN = 2;
               public RobotThemeManager(Context c) { sp = c.getSharedPreferences("LML_THEME", Context.MODE_PRIVATE); }
               public void setTheme(int theme) { sp.edit().putInt("theme_id", theme).apply(); }
               public int getTheme() { return sp.getInt("theme_id", THEME_NOIR_OR); }
-              public int getMainColor() { int t = getTheme(); if (SystemMonitor.isBatteryLow) return 0xFFFF3333; if (t == THEME_NOIR_OR) return 0xFFFFD700; if (t == THEME_CYBER_VIOLET) return 0xFF9D00FF; return 0xFF00FFFF; }
-              public int getBgColor() { return 0xFA020202; }
+              public int getMainColor() { int t = getTheme(); if (SystemMonitor.isBatteryLow) return Color.parseColor("#FF3333"); if (t == THEME_NOIR_OR) return Color.parseColor("#FFD700"); if (t == THEME_CYBER_VIOLET) return Color.parseColor("#9D00FF"); return Color.parseColor("#00FFFF"); }
+              public int getBgColor() { return Color.parseColor("#FA0202"); }
           }
           EOF
 
@@ -417,16 +419,16 @@ jobs:
 
           cat > app/src/main/java/com/lml/robotai/MapOverlayView.java <<'EOF'
           package com.lml.robotai;
-          import android.content.Context; import android.graphics.Canvas; import android.graphics.Paint; import android.view.View; import java.util.ArrayList; import java.util.List;
+          import android.content.Context; import android.graphics.Canvas; import android.graphics.Paint; import android.graphics.Color; import android.view.View; import java.util.ArrayList; import java.util.List;
           public class MapOverlayView extends View {
               private List<ScreenNode> nodes = new ArrayList<>(); private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG); private final Paint txt = new Paint(Paint.ANTI_ALIAS_FLAG); private boolean visibleBoxes = true;
-              public MapOverlayView(Context c) { super(c); p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(4); txt.setTextSize(22); txt.setColor(0xFFFFFFFF); }
+              public MapOverlayView(Context c) { super(c); p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(4); txt.setTextSize(22); txt.setColor(Color.WHITE); }
               public void setBoxes(boolean v) { visibleBoxes = v; invalidate(); }
               public void setNodes(List<ScreenNode> n) { nodes = n == null ? new ArrayList<>() : n; invalidate(); }
               @Override protected void onDraw(Canvas c) {
                   if (!visibleBoxes) return; 
                   for (ScreenNode n : nodes) { 
-                      if (n.danger) p.setColor(0xFFFF4040); else if (n.editable) p.setColor(0xFF4080FF); else if (n.scrollable) p.setColor(0xFFB57CFF); else if (n.clickable) p.setColor(0xFF00E5FF); else p.setColor(0x66FFFFFF); 
+                      if (n.danger) p.setColor(Color.parseColor("#FF4040")); else if (n.editable) p.setColor(Color.parseColor("#4080FF")); else if (n.scrollable) p.setColor(Color.parseColor("#B57CFF")); else if (n.clickable) p.setColor(Color.parseColor("#00E5FF")); else p.setColor(Color.parseColor("#66FFFFFF")); 
                       c.drawRect(n.bounds, p); if (n.clickable || n.editable) c.drawText("" + n.id, n.bounds.left + 6, n.bounds.top + 24, txt); 
                   }
               }
@@ -504,7 +506,7 @@ jobs:
                   x += (targetX - x) * 0.15f; y += (targetY - y) * 0.15f; long t = System.currentTimeMillis(); float pulse = (float)(0.5 + 0.5 * Math.sin(t / 150.0));
                   int mainCol = theme.getMainColor();
                   p.setShader(new RadialGradient(x, y, 180 + pulse * 30, Color.argb(90, Color.red(mainCol), Color.green(mainCol), Color.blue(mainCol)), Color.TRANSPARENT, Shader.TileMode.CLAMP)); c.drawCircle(x, y, 180 + pulse * 30, p); p.setShader(null);
-                  p.setColor(0xFF000000); c.drawCircle(x, y, 65, p); p.setColor(mainCol); c.drawCircle(x, y, 25 + pulse * 15, p);
+                  p.setColor(Color.BLACK); c.drawCircle(x, y, 65, p); p.setColor(mainCol); c.drawCircle(x, y, 25 + pulse * 15, p);
                   stroke.setColor(Color.WHITE); stroke.setStrokeWidth(4); c.save(); c.rotate((t / 15) % 360, x, y); c.drawOval(new RectF(x - 100, y - 40, x + 100, y + 40), stroke); c.restore();
                   c.save(); c.rotate(-(t / 10) % 360, x, y); c.drawOval(new RectF(x - 40, y - 110, x + 40, y + 110), stroke); c.restore();
                   p.setColor(Color.argb(220, 5, 5, 5)); RectF box = new RectF(x - 120, y + 80, x + 120, y + 120); c.drawRoundRect(box, 10, 10, p);
@@ -566,14 +568,14 @@ jobs:
                   LinearLayout header = new LinearLayout(this); header.setOrientation(LinearLayout.HORIZONTAL);
                   TextView title = new TextView(this); title.setText("V42 TITAN PHOENIX"); title.setTextColor(theme.getMainColor()); title.setTextSize(13); title.setTypeface(null, android.graphics.Typeface.BOLD); header.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
                   
-                  header.addView(btn("STOP", 0xFFFF0000, v -> triggerPanic()), new LinearLayout.LayoutParams(80, -2)); 
-                  header.addView(btn("—", 0xFFFFFFFF, v -> togglePanel()), new LinearLayout.LayoutParams(80, -2)); 
-                  header.addView(btn("X", 0xFFFF3333, v -> stopSelf()), new LinearLayout.LayoutParams(80, -2)); panel.addView(header);
+                  header.addView(btn("STOP", Color.RED, v -> triggerPanic()), new LinearLayout.LayoutParams(80, -2)); 
+                  header.addView(btn("—", Color.WHITE, v -> togglePanel()), new LinearLayout.LayoutParams(80, -2)); 
+                  header.addView(btn("X", Color.parseColor("#FF3333"), v -> stopSelf()), new LinearLayout.LayoutParams(80, -2)); panel.addView(header);
                   
-                  logScroll = new ScrollView(this); logScroll.setTag("ui"); report = new TextView(this); report.setTextColor(0xFFCCCCCC); report.setTextSize(12); logScroll.addView(report); panel.addView(logScroll, new LinearLayout.LayoutParams(-1, 400));
+                  logScroll = new ScrollView(this); logScroll.setTag("ui"); report = new TextView(this); report.setTextColor(Color.parseColor("#CCCCCC")); report.setTextSize(12); logScroll.addView(report); panel.addView(logScroll, new LinearLayout.LayoutParams(-1, 400));
                   
                   LinearLayout chatBar = new LinearLayout(this); chatBar.setOrientation(LinearLayout.HORIZONTAL); chatBar.setTag("ui"); chatBar.setPadding(0, 10, 0, 0);
-                  chatInput = new EditText(this); chatInput.setHint("Demande moi d'agir..."); chatInput.setTextColor(Color.WHITE); chatInput.setHintTextColor(0xFF666666); chatInput.setBackground(bg(0xFF111111, theme.getMainColor(), 10));
+                  chatInput = new EditText(this); chatInput.setHint("Demande moi d'agir..."); chatInput.setTextColor(Color.WHITE); chatInput.setHintTextColor(Color.parseColor("#666666")); chatInput.setBackground(bg(Color.parseColor("#111111"), theme.getMainColor(), 10));
                   chatInput.setOnTouchListener((v, e) -> { if (e.getAction() == MotionEvent.ACTION_UP) forceKeyboard(); return false; });
                   chatBar.addView(chatInput, new LinearLayout.LayoutParams(0, -2, 1));
                   chatBar.addView(btn("ENVOYER", theme.getMainColor(), v -> parseAndRun()), new LinearLayout.LayoutParams(120, -2));
@@ -660,13 +662,13 @@ jobs:
 
                           String nextCmd = commande.toLowerCase().replace("\n", "");
                           if (nextCmd.contains("done") || nextCmd.equals("fini")) { 
-                              chatLog("<font color='#00FF00'><b>TITAN:</b> Objectif Atteint. (" + pensee + ")</font>"); 
+                              chatLog("<font color='#00FF00'><b>TITAN:</b> [OK] Objectif Atteint. (" + pensee + ")</font>"); 
                               agentGoal = null; robot.setVisibility(android.view.View.GONE); map.setVisibility(android.view.View.GONE); 
                           } 
                           else { 
                               agentHistory.add(nextCmd); if(agentHistory.size() > 5) agentHistory.remove(0); 
-                              if(isStuck) chatLog("<font color='#FF6600'><i>Correction en cours...</i></font>");
-                              chatLog("<font color='#AAAAAA'><i>" + pensee + "</i></font>"); 
+                              if(isStuck) chatLog("<font color='#FF6600'><i>[!] Correction en cours...</i></font>");
+                              chatLog("<font color='#AAAAAA'><i>> " + pensee + "</i></font>"); 
                               List<String> steps = new ArrayList<>(); steps.add(nextCmd); executeStepsSequentially(steps, 0); 
                           }
                       });
@@ -830,7 +832,7 @@ jobs:
               @SuppressWarnings("deprecation")
               private void chatLog(String msg) { report.append(Html.fromHtml(msg + "<br><br>")); logScroll.post(() -> logScroll.fullScroll(android.view.View.FOCUS_DOWN)); }
               private void startLoops() { mainHandler.postDelayed(new Runnable() { @Override public void run() { monitor.getTelemetry(); mainHandler.postDelayed(this, 5000); } }, 1000); }
-              private Button btn(String s, int c, android.view.View.OnClickListener l) { Button b = new Button(this); b.setText(s); b.setTextColor(Color.WHITE); b.setTextSize(10); b.setBackground(bg(0xFF151515, c, 10)); b.setOnClickListener(l); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(4,4,4,4); b.setLayoutParams(lp); return b; }
+              private Button btn(String s, int c, android.view.View.OnClickListener l) { Button b = new Button(this); b.setText(s); b.setTextColor(Color.WHITE); b.setTextSize(10); b.setBackground(bg(Color.parseColor("#151515"), c, 10)); b.setOnClickListener(l); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(4,4,4,4); b.setLayoutParams(lp); return b; }
               private GradientDrawable bg(int f, int s, int r) { GradientDrawable g = new GradientDrawable(); g.setColor(f); g.setCornerRadius(r); g.setStroke(2, s); return g; }
               @Override public void onDestroy() { try { wm.removeView(panel); wm.removeView(robot); wm.removeView(map); mainHandler.removeCallbacksAndMessages(null); } catch(Exception e){} }
           }
@@ -843,60 +845,61 @@ jobs:
               private RobotThemeManager theme; private SkillManager skillManager;
               @Override protected void onCreate(Bundle b) {
                   super.onCreate(b); theme = new RobotThemeManager(this); skillManager = new SkillManager(this);
-                  ScrollView scroll = new ScrollView(this); scroll.setBackgroundColor(0xFF000000);
+                  ScrollView scroll = new ScrollView(this); scroll.setBackgroundColor(Color.BLACK);
                   LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setPadding(40, 50, 40, 50); scroll.addView(root);
 
                   TextView title = new TextView(this); title.setText("LML V42 PHOENIX"); title.setTextColor(theme.getMainColor()); title.setTextSize(28); title.setTypeface(null, android.graphics.Typeface.BOLD); title.setGravity(Gravity.CENTER); root.addView(title);
                   
                   LinearLayout start = card("SYSTEM CORE");
-                  start.addView(btn("1. OVERLAY PERMISSION", 0xFF00FFFF, v -> startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())))));
-                  start.addView(btn("2. ACCESSIBILITY", 0xFF9D00FF, v -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))));
-                  start.addView(btn("3. BOOT TITAN AGENT", 0xFFFFD700, v -> startService(new Intent(this, FloatingRobotService.class))));
+                  start.addView(btn("1. OVERLAY PERMISSION", Color.parseColor("#00FFFF"), v -> startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())))));
+                  start.addView(btn("2. ACCESSIBILITY", Color.parseColor("#9D00FF"), v -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))));
+                  start.addView(btn("3. BOOT TITAN AGENT", Color.parseColor("#FFD700"), v -> startService(new Intent(this, FloatingRobotService.class))));
                   root.addView(start);
 
                   LinearLayout skillCard = card("SKILL BUILDER (V42)");
-                  EditText skillName = new EditText(this); skillName.setHint("Nom (ex: msg auto)"); skillName.setTextColor(Color.WHITE); skillName.setHintTextColor(0xFF666666);
-                  EditText skillSeq = new EditText(this); skillSeq.setHint("Ex: lance snap puis ecris \"salut\" dans recherche"); skillSeq.setTextColor(Color.WHITE); skillSeq.setHintTextColor(0xFF666666);
-                  TextView skillList = new TextView(this); skillList.setTextColor(0xFFCCCCCC); skillList.setTextSize(12); skillList.setPadding(0, 20, 0, 0);
+                  EditText skillName = new EditText(this); skillName.setHint("Nom (ex: msg auto)"); skillName.setTextColor(Color.WHITE); skillName.setHintTextColor(Color.parseColor("#666666"));
+                  EditText skillSeq = new EditText(this); skillSeq.setHint("Ex: lance snap puis ecris \"salut\" dans recherche"); skillSeq.setTextColor(Color.WHITE); skillSeq.setHintTextColor(Color.parseColor("#666666"));
+                  TextView skillList = new TextView(this); skillList.setTextColor(Color.parseColor("#CCCCCC")); skillList.setTextSize(12); skillList.setPadding(0, 20, 0, 0);
                   
                   Runnable updateList = () -> { 
                       StringBuilder sb = new StringBuilder("SKILLS ACTIVES:\n"); 
-                      for(String k : skillManager.getAll().keySet()) sb.append("⚡ ").append(k).append(" -> ").append(skillManager.getSkill(k)).append("\n"); 
+                      for(String k : skillManager.getAll().keySet()) sb.append("> ").append(k).append(" -> ").append(skillManager.getSkill(k)).append("\n"); 
                       skillList.setText(sb.toString()); 
                   }; updateList.run();
                   
                   skillCard.addView(skillName); skillCard.addView(skillSeq);
                   LinearLayout skillBtns = new LinearLayout(this); skillBtns.setOrientation(LinearLayout.HORIZONTAL);
-                  skillBtns.addView(btn("SAVE", 0xFF9D00FF, v -> { skillManager.saveSkill(skillName.getText().toString(), skillSeq.getText().toString()); skillName.setText(""); skillSeq.setText(""); updateList.run(); }), new LinearLayout.LayoutParams(0,-2,1));
-                  skillBtns.addView(btn("PURGER", 0xFFFF3333, v -> { skillManager.clearSkills(); updateList.run(); }), new LinearLayout.LayoutParams(0,-2,1));
+                  skillBtns.addView(btn("SAVE", Color.parseColor("#9D00FF"), v -> { skillManager.saveSkill(skillName.getText().toString(), skillSeq.getText().toString()); skillName.setText(""); skillSeq.setText(""); updateList.run(); }), new LinearLayout.LayoutParams(0,-2,1));
+                  skillBtns.addView(btn("PURGER", Color.parseColor("#FF3333"), v -> { skillManager.clearSkills(); updateList.run(); }), new LinearLayout.LayoutParams(0,-2,1));
                   skillCard.addView(skillBtns); skillCard.addView(skillList);
                   root.addView(skillCard);
 
                   LinearLayout themes = card("LML AESTHETICS");
-                  themes.addView(btn("EDITION OR & NOIR", 0xFFFFD700, v -> updateTheme(RobotThemeManager.THEME_NOIR_OR)));
-                  themes.addView(btn("NEON CYAN", 0xFF00FFFF, v -> updateTheme(RobotThemeManager.THEME_NEON_CYAN)));
-                  themes.addView(btn("CYBER VIOLET", 0xFF9D00FF, v -> updateTheme(RobotThemeManager.THEME_CYBER_VIOLET)));
+                  themes.addView(btn("EDITION OR & NOIR", Color.parseColor("#FFD700"), v -> updateTheme(RobotThemeManager.THEME_NOIR_OR)));
+                  themes.addView(btn("NEON CYAN", Color.parseColor("#00FFFF"), v -> updateTheme(RobotThemeManager.THEME_NEON_CYAN)));
+                  themes.addView(btn("CYBER VIOLET", Color.parseColor("#9D00FF"), v -> updateTheme(RobotThemeManager.THEME_CYBER_VIOLET)));
                   root.addView(themes);
 
                   setContentView(scroll);
               }
               private void updateTheme(int t) { theme.setTheme(t); recreate(); }
               private LinearLayout card(String t) {
-                  LinearLayout c = new LinearLayout(this); c.setOrientation(LinearLayout.VERTICAL); c.setPadding(25, 25, 25, 25); c.setBackground(bg(0xFF0A0A0A, 0xFF333333, 20));
+                  LinearLayout c = new LinearLayout(this); c.setOrientation(LinearLayout.VERTICAL); c.setPadding(25, 25, 25, 25); c.setBackground(bg(Color.parseColor("#0A0A0A"), Color.parseColor("#333333"), 20));
                   LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, 20, 0, 20); c.setLayoutParams(lp);
-                  TextView txt = new TextView(this); txt.setText(t); txt.setTextColor(0xFF888888); txt.setPadding(0, 0, 0, 15); c.addView(txt); return c;
+                  TextView txt = new TextView(this); txt.setText(t); txt.setTextColor(Color.parseColor("#888888")); txt.setPadding(0, 0, 0, 15); c.addView(txt); return c;
               }
               private Button btn(String s, int c, android.view.View.OnClickListener l) {
-                  Button b = new Button(this); b.setText(s); b.setTextColor(Color.WHITE); b.setTextSize(12); b.setBackground(bg(0xFF151515, c, 12)); b.setOnClickListener(l);
+                  Button b = new Button(this); b.setText(s); b.setTextColor(Color.WHITE); b.setTextSize(12); b.setBackground(bg(Color.parseColor("#151515"), c, 12)); b.setOnClickListener(l);
                   LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(4, 10, 4, 10); b.setLayoutParams(lp); return b;
               }
               private GradientDrawable bg(int f, int s, int r) { GradientDrawable g = new GradientDrawable(); g.setColor(f); g.setCornerRadius(r); g.setStroke(3, s); return g; }
           }
           EOF
 
-      - name: Build signed release APK
+      - name: Compile with Gradle Wrapper
         run: |
-          gradle assembleRelease --no-daemon --stacktrace --info
+          gradle wrapper --gradle-version 8.7
+          ./gradlew assembleRelease --no-daemon --stacktrace --info
 
       - name: Prepare APK files
         run: |
