@@ -1,344 +1,848 @@
-name: LML XTREND SCALPING AGI - PRODUCTION BUILD
+name: LML ROBOT V42 TITAN PHOENIX (TIKTOK EDITION)
 
 on:
   push:
-    branches: [ main ]
   workflow_dispatch:
+  repository_dispatch:
+    types: [ai_self_update]
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
-  build_lml_agent:
+  build:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+
     steps:
       - uses: actions/checkout@v4
 
-      # 1. Configuration explicite de Java 17 (Requis pour Android)
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          distribution: temurin
+          java-version: 17
 
-      - name: Build Project Structure and Files
+      - uses: android-actions/setup-android@v4
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+
+      - name: Create complete LML Robot AI V42 project
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'lmlrobot' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'lml' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'lmlrobot' }}
         run: |
-          mkdir -p app/src/main/java/com/lml/tradingbot
+          rm -rf app
+          mkdir -p app/src/main/java/com/lml/robotai
           mkdir -p app/src/main/res/xml
+          mkdir -p app/src/main/res/values
 
-          # AndroidManifest.xml
-          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          cat > settings.gradle <<'EOF'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+          rootProject.name = "LMLRobotAIV42"
+          include ":app"
+          EOF
+
+          cat > build.gradle <<'EOF'
+          plugins { id "com.android.application" version "8.5.2" apply false }
+          EOF
+
+          cat > gradle.properties <<'EOF'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
+          EOF
+
+          cat > app/build.gradle <<'EOF'
+          plugins { id "com.android.application" }
+          def runNumber = System.getenv("GITHUB_RUN_NUMBER")
+          def autoVersionCode = runNumber != null ? runNumber.toInteger() : 1
+          def autoVersionName = "1.0." + autoVersionCode
+          android {
+              namespace "com.lml.robotai"
+              compileSdk 34
+              defaultConfig {
+                  applicationId "com.lml.robotai.v42"
+                  minSdk 26
+                  targetSdk 34
+                  versionCode autoVersionCode
+                  versionName autoVersionName
+              }
+              buildFeatures { buildConfig true }
+              compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+              
+              signingConfigs { 
+                  lmlStable { 
+                      storeFile file("lml-stable.keystore")
+                      storePassword "lmlrobot"
+                      keyAlias "lml"
+                      keyPassword "lmlrobot"
+                  } 
+              }
+              buildTypes { 
+                  debug { signingConfig signingConfigs.lmlStable }
+                  release { signingConfig signingConfigs.lmlStable; minifyEnabled false } 
+              }
+          }
+          dependencies {
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+          }
+          EOF
+
+          cat > app/src/main/res/values/strings.xml <<'EOF'
+          <resources>
+              <string name="app_name">LML V42 PHOENIX</string>
+              <string name="accessibility_desc">LML AGI V42 : Auto-Correction, Résolution d\'erreurs, Nettoyage TikTok & Snap.</string>
+          </resources>
+          EOF
+
+          cat > app/src/main/res/xml/accessibility_service_config.xml <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.lml.tradingbot">
-              <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
-              <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE" />
-              <application android:label="LML XTREND AGI">
-                  <service android:name=".TradingAccessibility" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="true">
-                      <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
+          <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+              android:description="@string/accessibility_desc"
+              android:accessibilityEventTypes="typeViewClicked|typeViewFocused|typeWindowStateChanged|typeWindowContentChanged"
+              android:accessibilityFeedbackType="feedbackGeneric"
+              android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows|flagIncludeNotImportantViews"
+              android:canRetrieveWindowContent="true"
+              android:canPerformGestures="true"
+              android:notificationTimeout="80" />
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+              <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+              <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+              <application android:theme="@android:style/Theme.Material.NoActionBar" android:label="LML V42 PHOENIX" android:allowBackup="false" android:supportsRtl="true" android:resizeableActivity="true">
+                  <activity android:name=".MainActivity" android:exported="true" android:windowSoftInputMode="adjustResize">
+                      <intent-filter> <action android:name="android.intent.action.MAIN" /> <category android:name="android.intent.category.LAUNCHER" /> </intent-filter>
+                  </activity>
+                  <service android:name=".FloatingRobotService" android:exported="false" />
+                  <service android:name=".LmlAccessibilityService" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="true">
+                      <intent-filter> <action android:name="android.accessibilityservice.AccessibilityService" /> </intent-filter>
                       <meta-data android:name="android.accessibilityservice" android:resource="@xml/accessibility_service_config" />
                   </service>
-                  <service android:name=".TradingOverlayService" />
               </application>
           </manifest>
           EOF
 
-          # Config Accessibilité
-          cat > app/src/main/res/xml/accessibility_service_config.xml <<'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-              android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
-              android:accessibilityFeedbackType="feedbackGeneric"
-              android:canRetrieveWindowContent="true"
-              android:canPerformGestures="true" />
+          cat > app/src/main/java/com/lml/robotai/SkillManager.java <<'EOF'
+          package com.lml.robotai;
+          import android.content.Context; import android.content.SharedPreferences; import java.util.Map;
+          public class SkillManager {
+              private final SharedPreferences sp;
+              public SkillManager(Context c) { sp = c.getSharedPreferences("LML_SKILLS", Context.MODE_PRIVATE); }
+              public void saveSkill(String name, String seq) { if(name!=null && seq!=null) sp.edit().putString(name.toLowerCase().trim(), seq.trim()).apply(); }
+              public String getSkill(String name) { return name == null ? null : sp.getString(name.toLowerCase().trim(), null); }
+              public Map<String, ?> getAll() { return sp.getAll(); }
+              public void clearSkills() { sp.edit().clear().apply(); }
+          }
           EOF
 
-          # TradingAccessibility.java
-          cat > app/src/main/java/com/lml/tradingbot/TradingAccessibility.java <<'EOF'
-          package com.lml.tradingbot;
-          import android.accessibilityservice.AccessibilityService;
-          import android.view.accessibility.AccessibilityEvent;
-          import android.view.accessibility.AccessibilityNodeInfo;
-          import android.content.Intent;
+          cat > app/src/main/java/com/lml/robotai/SafetyGuard.java <<'EOF'
+          package com.lml.robotai;
+          public class SafetyGuard {
+              public static boolean bypassForSafeMode = false;
+              public static boolean isDanger(String raw) {
+                  if (bypassForSafeMode) return false; 
+                  if (raw == null) return false; String s = raw.toLowerCase();
+                  String[] danger = {"acheter","achat","buy","vendre","vente","sell","depot","deposit","retrait","withdraw","payer","paiement","payment","envoyer","send","password","mot de passe","banque","virement","transfer","trade","order","long","short","leverage"};
+                  for (String d : danger) if (s.contains(d)) return true; return false;
+              }
+          }
+          EOF
 
-          public class TradingAccessibility extends AccessibilityService {
-              private double lastPrice = 0.0;
-              private long lastUpdateTime = 0;
+          cat > app/src/main/java/com/lml/robotai/AgiNetworkManager.java <<'EOF'
+          package com.lml.robotai;
+          import java.io.BufferedReader; import java.io.InputStreamReader; import java.io.OutputStream; import java.net.HttpURLConnection; import java.net.URL; import java.util.concurrent.ExecutorService; import java.util.concurrent.Executors;
+          
+          public class AgiNetworkManager {
+              private final ExecutorService executor = Executors.newSingleThreadExecutor();
+              private final String API_KEY = "TA_CLE_API_GEMINI_ICI"; 
+              private final String ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=";
+
+              public interface LlmCallback { void onResponse(String answer, boolean success); }
               
-              private double seuilMomentum = 10.0; 
-              private boolean enPosition = false; 
-              private double prixEntree = 0.0;
-              private String typeTrade = ""; 
-              private double capitalSimule = 100.0; 
-
-              @Override
-              public void onServiceConnected() { 
-                  startService(new Intent(this, TradingOverlayService.class)); 
+              public void sendPrompt(String systemContext, String userPrompt, LlmCallback cb) {
+                  executor.execute(() -> {
+                      try {
+                          URL url = new URL(ENDPOINT + API_KEY); HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                          conn.setRequestMethod("POST"); conn.setRequestProperty("Content-Type", "application/json"); conn.setDoOutput(true);
+                          
+                          String safeSys = systemContext.replace("\"", "\\\"").replace("\n", " "); 
+                          String safePrompt = userPrompt.replace("\"", "\\\"").replace("\n", " ");
+                          String combinedPrompt = safeSys + " | INSTRUCTION: " + safePrompt;
+                          String payload = "{\"contents\":[{\"parts\":[{\"text\":\"" + combinedPrompt + "\"}]}]}";
+                          
+                          try(OutputStream os = conn.getOutputStream()) { byte[] input = payload.getBytes("utf-8"); os.write(input, 0, input.length); }
+                          if (conn.getResponseCode() == 200) {
+                              BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8")); StringBuilder resp = new StringBuilder(); String line;
+                              while ((line = br.readLine()) != null) resp.append(line.trim());
+                              String raw = resp.toString(); int start = raw.indexOf("\"text\": \"") + 9; int end = raw.indexOf("\"", start);
+                              if (start > 8 && end > start) { cb.onResponse(raw.substring(start, end).replace("\\n", "\n").replace("\\\"", "\""), true); } 
+                              else { cb.onResponse("Réponse Gemini illisible.", false); }
+                          } else { cb.onResponse("Erreur API Gemini HTTP: " + conn.getResponseCode(), false); }
+                      } catch (Exception e) { cb.onResponse("Erreur de connexion.", false); }
+                  });
               }
+          }
+          EOF
 
-              @Override
-              public void onAccessibilityEvent(AccessibilityEvent event) {
-                  if (System.currentTimeMillis() - lastUpdateTime < 200) return; 
-                  
-                  AccessibilityNodeInfo rootNode = getRootInActiveWindow();
-                  if (rootNode != null) {
-                      if (enPosition) {
-                          if (verifierPopUpFinDeTrade(rootNode)) {
-                              enPosition = false;
-                              lastPrice = 0.0; 
-                              mettreAJourHUD("SCAN (Analyse du marché)", 0.0);
-                          }
-                      } else {
-                          chercherPrixEtAnalyser(rootNode, rootNode);
-                      }
+          cat > app/src/main/java/com/lml/robotai/GithubUplink.java <<'EOF'
+          package com.lml.robotai;
+          import java.io.OutputStream; import java.net.HttpURLConnection; import java.net.URL; import java.util.concurrent.Executors;
+          public class GithubUplink {
+              private static final String GH_TOKEN = "TON_TOKEN_GITHUB_ICI";
+              private static final String REPO = "TonPseudo/TonRepo";
+              
+              public static void triggerBuild(String newFeatureLog) {
+                  Executors.newSingleThreadExecutor().execute(() -> {
+                      try {
+                          URL url = new URL("https://api.github.com/repos/" + REPO + "/dispatches");
+                          HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                          conn.setRequestMethod("POST");
+                          conn.setRequestProperty("Authorization", "Bearer " + GH_TOKEN);
+                          conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
+                          conn.setRequestProperty("Content-Type", "application/json");
+                          conn.setDoOutput(true);
+                          
+                          String safeLog = newFeatureLog.replace("\"", "\\\"").replace("\n", " ");
+                          String payload = "{\"event_type\": \"ai_self_update\", \"client_payload\": {\"feature\": \"" + safeLog + "\"}}";
+                          
+                          try(OutputStream os = conn.getOutputStream()) { os.write(payload.getBytes("utf-8")); }
+                          conn.getResponseCode();
+                      } catch (Exception e) { e.printStackTrace(); }
+                  });
+              }
+          }
+          EOF
+
+          cat > app/src/main/java/com/lml/robotai/AgiIntentParser.java <<'EOF'
+          package com.lml.robotai;
+          import java.util.ArrayList; import java.util.List; import java.util.regex.Matcher; import java.util.regex.Pattern;
+          public class AgiIntentParser {
+              public static String extractQuoteArgument(String command) { Matcher m = Pattern.compile("[\"'](.*?)[\"']").matcher(command); if (m.find()) return m.group(1); return null; }
+              public static List<String> parseSequence(String rawCommand) {
+                  List<String> steps = new ArrayList<>(); if (rawCommand == null || rawCommand.trim().isEmpty()) return steps;
+                  String[] parts = rawCommand.toLowerCase().split("\\bpनंतर\\b|\\bpuis\\b|\\bet\\b|\\bensuite\\b|\\baprès\\b");
+                  for (String p : parts) { String clean = p.trim(); if (!clean.isEmpty()) steps.add(clean); } return steps;
+              }
+          }
+          EOF
+
+          cat > app/src/main/java/com/lml/robotai/ScreenNode.java <<'EOF'
+          package com.lml.robotai;
+          import android.graphics.Rect; import android.view.accessibility.AccessibilityNodeInfo;
+          public class ScreenNode {
+              public int id;
+              public String text, desc, cls, pkg; public Rect bounds; public boolean clickable, danger, editable, scrollable, checked; public int confidence; public AccessibilityNodeInfo rawNode;
+              public ScreenNode(AccessibilityNodeInfo n, Rect b) {
+                  text = n.getText()==null?"":n.getText().toString().replace("\n"," "); desc = n.getContentDescription()==null?"":n.getContentDescription().toString().replace("\n"," "); 
+                  cls = n.getClassName()==null?"":n.getClassName().toString(); pkg = n.getPackageName()==null?"":n.getPackageName().toString();
+                  bounds = b == null ? new Rect() : b; clickable = n.isClickable(); editable = n.isEditable(); scrollable = n.isScrollable(); checked = n.isChecked();
+                  danger = SafetyGuard.isDanger(label()); confidence = 40; rawNode = n; 
+                  if (clickable) confidence += 25; if (editable) confidence += 40; if (label().length() > 0) confidence += 20; 
+                  if (bounds.width() > 20 && bounds.height() > 20) confidence += 5; if (danger) confidence = 0; if (confidence > 99) confidence = 99;
+              }
+              public String label() { return (text + " " + desc).trim(); }
+              public int cx() { return bounds.centerX(); } public int cy() { return bounds.centerY(); }
+          }
+          EOF
+
+          cat > app/src/main/java/com/lml/robotai/ScreenAnalyzer.java <<'EOF'
+          package com.lml.robotai;
+          import android.graphics.Rect; import android.view.accessibility.AccessibilityNodeInfo; import java.util.ArrayList; import java.util.List;
+          public class ScreenAnalyzer {
+              public static List<ScreenNode> scan(AccessibilityNodeInfo root) { 
+                  List<ScreenNode> out = new ArrayList<>(); walk(root, out); 
+                  for(int i=0; i<out.size(); i++) out.get(i).id = i; 
+                  return out; 
+              }
+              private static void walk(AccessibilityNodeInfo n, List<ScreenNode> out) {
+                  if (n == null) return; Rect r = new Rect(); n.getBoundsInScreen(r);
+                  if (r.width() > 10 && r.height() > 10) {
+                      boolean hasText = (n.getText() != null && n.getText().length() > 0) || (n.getContentDescription() != null && n.getContentDescription().length() > 0);
+                      if (n.isClickable() || n.isEditable() || n.isScrollable() || hasText) { out.add(new ScreenNode(n, r)); }
+                  }
+                  for (int i = 0; i < n.getChildCount(); i++) { AccessibilityNodeInfo c = n.getChild(i); walk(c, out); }
+              }
+              public static String exportCognitiveMap(List<ScreenNode> nodes) {
+                  StringBuilder sb = new StringBuilder("ECRAN ACTUEL:\n");
+                  for (ScreenNode n : nodes) {
+                      String lbl = n.label();
+                      if(lbl.isEmpty() && !n.clickable && !n.editable) continue;
+                      sb.append("[ID:").append(n.id).append("] ");
+                      if(n.editable) sb.append("CHAMP_TEXTE ");
+                      else if(n.clickable) sb.append("BOUTON ");
+                      else sb.append("INFO ");
+                      sb.append("'").append(lbl).append("' ");
+                      if(n.scrollable) sb.append("(Scrolable) ");
+                      sb.append("\n");
+                  }
+                  return sb.toString();
+              }
+          }
+          EOF
+
+          cat > app/src/main/java/com/lml/robotai/RobotThemeManager.java <<'EOF'
+          package com.lml.robotai;
+          import android.content.Context; import android.content.SharedPreferences;
+          public class RobotThemeManager {
+              private final SharedPreferences sp; public static final int THEME_NOIR_OR = 0; public static final int THEME_CYBER_VIOLET = 1; public static final int THEME_NEON_CYAN = 2;
+              public RobotThemeManager(Context c) { sp = c.getSharedPreferences("LML_THEME", Context.MODE_PRIVATE); }
+              public void setTheme(int theme) { sp.edit().putInt("theme_id", theme).apply(); }
+              public int getTheme() { return sp.getInt("theme_id", THEME_NOIR_OR); }
+              public int getMainColor() { int t = getTheme(); if (SystemMonitor.isBatteryLow) return 0xFFFF3333; if (t == THEME_NOIR_OR) return 0xFFFFD700; if (t == THEME_CYBER_VIOLET) return 0xFF9D00FF; return 0xFF00FFFF; }
+              public int getBgColor() { return 0xFA020202; }
+          }
+          EOF
+
+          cat > app/src/main/java/com/lml/robotai/SystemMonitor.java <<'EOF'
+          package com.lml.robotai;
+          import android.content.Context; import android.app.ActivityManager; import android.content.Intent; import android.content.IntentFilter; import android.os.BatteryManager;
+          public class SystemMonitor {
+              private final Context ctx; public static boolean isBatteryLow = false; public static boolean isRamCritical = false;
+              public SystemMonitor(Context c) { ctx = c; }
+              public String getTelemetry() {
+                  try {
+                      ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE); ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
+                      if (am != null) am.getMemoryInfo(mi); long ramFree = mi.availMem / 1048576L; long ramTotal = mi.totalMem / 1048576L;
+                      isRamCritical = ramFree < (ramTotal * 0.15);
+                      IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED); Intent batteryStatus = ctx.registerReceiver(null, ifilter);
+                      int level = batteryStatus != null ? batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) : -1; isBatteryLow = level > 0 && level <= 20;
+                      return "SYS: " + level + "% BAT | " + ramFree + "MB RAM";
+                  } catch (Exception e) { return "SYS: ERR"; }
+              }
+          }
+          EOF
+
+          cat > app/src/main/java/com/lml/robotai/NeuralSwarm.java <<'EOF'
+          package com.lml.robotai;
+          import java.util.List;
+          public class NeuralSwarm {
+              public ScreenNode findById(List<ScreenNode> nodes, int id) {
+                  if (nodes == null) return null;
+                  for (ScreenNode n : nodes) { if (n.id == id) return n; } return null;
+              }
+              public ScreenNode findByText(List<ScreenNode> nodes, String query) {
+                  if (nodes == null || query == null || query.isEmpty()) return null;
+                  String q = query.toLowerCase().trim(); ScreenNode best = null; int bestScore = -1;
+                  for (ScreenNode n : nodes) { 
+                      if (n.label().toLowerCase().contains(q)) {
+                          if (!n.danger || SafetyGuard.bypassForSafeMode) { int s = 60 + n.confidence; if (s > bestScore) { best = n; bestScore = s; } }
+                      } 
+                  } return best;
+              }
+              public ScreenNode findInputByText(List<ScreenNode> nodes, String query) {
+                  if (nodes == null || query == null || query.isEmpty()) return null;
+                  String q = query.toLowerCase().trim(); ScreenNode best = null; int bestScore = -1;
+                  for (ScreenNode n : nodes) { 
+                      if (n.editable && n.label().toLowerCase().contains(q)) {
+                          if (!n.danger || SafetyGuard.bypassForSafeMode) { int s = 80; if (s > bestScore) { best = n; bestScore = s; } }
+                      } 
+                  } return best; 
+              }
+          }
+          EOF
+
+          cat > app/src/main/java/com/lml/robotai/AgiActionManager.java <<'EOF'
+          package com.lml.robotai;
+          import android.content.Context; import android.content.Intent; import android.content.pm.ApplicationInfo; import android.content.pm.PackageManager;
+          public class AgiActionManager {
+              private final Context ctx; public AgiActionManager(Context c) { ctx = c; }
+              public String launchApp(String appName) {
+                  if (appName == null || appName.trim().isEmpty()) return "Nom app vide."; String target = appName.toLowerCase().trim(); PackageManager pm = ctx.getPackageManager();
+                  for (ApplicationInfo app : pm.getInstalledApplications(PackageManager.GET_META_DATA)) {
+                      if (pm.getApplicationLabel(app).toString().toLowerCase().contains(target)) { Intent i = pm.getLaunchIntentForPackage(app.packageName); if (i != null) { i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); ctx.startActivity(i); return "Lancement natif: " + pm.getApplicationLabel(app); } }
+                  } return "App introuvable: " + appName;
+              }
+          }
+          EOF
+
+          cat > app/src/main/java/com/lml/robotai/MapOverlayView.java <<'EOF'
+          package com.lml.robotai;
+          import android.content.Context; import android.graphics.Canvas; import android.graphics.Paint; import android.view.View; import java.util.ArrayList; import java.util.List;
+          public class MapOverlayView extends View {
+              private List<ScreenNode> nodes = new ArrayList<>(); private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG); private final Paint txt = new Paint(Paint.ANTI_ALIAS_FLAG); private boolean visibleBoxes = true;
+              public MapOverlayView(Context c) { super(c); p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(4); txt.setTextSize(22); txt.setColor(0xFFFFFFFF); }
+              public void setBoxes(boolean v) { visibleBoxes = v; invalidate(); }
+              public void setNodes(List<ScreenNode> n) { nodes = n == null ? new ArrayList<>() : n; invalidate(); }
+              @Override protected void onDraw(Canvas c) {
+                  if (!visibleBoxes) return; 
+                  for (ScreenNode n : nodes) { 
+                      if (n.danger) p.setColor(0xFFFF4040); else if (n.editable) p.setColor(0xFF4080FF); else if (n.scrollable) p.setColor(0xFFB57CFF); else if (n.clickable) p.setColor(0xFF00E5FF); else p.setColor(0x66FFFFFF); 
+                      c.drawRect(n.bounds, p); if (n.clickable || n.editable) c.drawText("" + n.id, n.bounds.left + 6, n.bounds.top + 24, txt); 
                   }
               }
+          }
+          EOF
 
-              private boolean verifierPopUpFinDeTrade(AccessibilityNodeInfo node) {
-                  if (node == null) return false;
+          cat > app/src/main/java/com/lml/robotai/LmlAccessibilityService.java <<'EOF'
+          package com.lml.robotai;
+          import android.accessibilityservice.AccessibilityService; import android.accessibilityservice.GestureDescription; import android.graphics.Path; import android.os.Bundle; import android.view.accessibility.AccessibilityEvent; import android.view.accessibility.AccessibilityWindowInfo; import android.view.accessibility.AccessibilityNodeInfo; import java.util.ArrayList; import java.util.List;
+          public class LmlAccessibilityService extends AccessibilityService {
+              public static LmlAccessibilityService INSTANCE; private List<ScreenNode> nodes = new ArrayList<>();
+              @Override protected void onServiceConnected() { INSTANCE = this; }
+              @Override public void onAccessibilityEvent(AccessibilityEvent e) { }
+              @Override public void onInterrupt() {}
+              
+              public List<ScreenNode> scan() { 
+                  nodes.clear(); 
+                  List<AccessibilityWindowInfo> windows = getWindows();
+                  boolean targetAppFound = false;
+                  for (AccessibilityWindowInfo window : windows) {
+                      if (window != null && window.getRoot() != null) {
+                          AccessibilityNodeInfo root = window.getRoot(); CharSequence pkg = root.getPackageName();
+                          if (pkg != null && (pkg.toString().contains("snapchat") || pkg.toString().contains("tiktok") || pkg.toString().contains("musically"))) { 
+                              if (!targetAppFound) { nodes.clear(); targetAppFound = true; } 
+                              nodes.addAll(ScreenAnalyzer.scan(root)); 
+                          } 
+                          else if (!targetAppFound && pkg != null && !pkg.toString().contains("com.lml.robotai") && !pkg.toString().contains("systemui") && !pkg.toString().contains("launcher")) { 
+                              nodes.addAll(ScreenAnalyzer.scan(root)); 
+                          }
+                          root.recycle();
+                      }
+                  } return nodes; 
+              }
+
+              public void tap(int x, int y) { try { Path path = new Path(); path.moveTo(x, y); path.lineTo(x + 1, y + 1); dispatchGesture(new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path, 0, 80)).build(), null, null); } catch (Exception e) {} }
+              public void longPress(int x, int y) { try { Path path = new Path(); path.moveTo(x, y); path.lineTo(x + 1, y + 1); dispatchGesture(new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path, 0, 1000)).build(), null, null); } catch (Exception e) {} }
+              public void swipe(int startX, int startY, int endX, int endY) { try { Path path = new Path(); path.moveTo(startX, startY); path.lineTo(endX, endY); dispatchGesture(new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path, 0, 400)).build(), null, null); } catch (Exception e) {} }
+              public void dragAndDrop(int startX, int startY, int endX, int endY) { try { Path path = new Path(); path.moveTo(startX, startY); path.lineTo(endX, endY); dispatchGesture(new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path, 0, 1500)).build(), null, null); } catch (Exception e) {} }
+              public void pinchZoom(int centerX, int centerY, boolean zoomIn) {
+                  try {
+                      Path path1 = new Path(); Path path2 = new Path();
+                      int offset = zoomIn ? 100 : 300; int endOffset = zoomIn ? 300 : 100;
+                      path1.moveTo(centerX - offset, centerY); path1.lineTo(centerX - endOffset, centerY);
+                      path2.moveTo(centerX + offset, centerY); path2.lineTo(centerX + endOffset, centerY);
+                      GestureDescription.Builder builder = new GestureDescription.Builder();
+                      builder.addStroke(new GestureDescription.StrokeDescription(path1, 0, 400));
+                      builder.addStroke(new GestureDescription.StrokeDescription(path2, 0, 400));
+                      dispatchGesture(builder.build(), null, null);
+                  } catch (Exception e) {}
+              }
+              public boolean injectText(ScreenNode node, String text) { if (node == null || node.rawNode == null || !node.editable) return false; Bundle arguments = new Bundle(); arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text); return node.rawNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments); }
+              public void goBack() { performGlobalAction(GLOBAL_ACTION_BACK); }
+              public void goHome() { performGlobalAction(GLOBAL_ACTION_HOME); }
+          }
+          EOF
+
+          cat > app/src/main/java/com/lml/robotai/RobotView.java <<'EOF'
+          package com.lml.robotai;
+          import android.content.Context; import android.graphics.Canvas; import android.graphics.Color; import android.graphics.Paint; import android.graphics.RadialGradient; import android.graphics.RectF; import android.graphics.Shader; import android.view.View;
+          public class RobotView extends View {
+              private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG); private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG); private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
+              private float x = 260, y = 430, targetX = 260, targetY = 430; private String label = "TITAN IDLE"; private final RobotThemeManager theme;
+              public RobotView(Context c) { super(c); theme = new RobotThemeManager(c); stroke.setStyle(Paint.Style.STROKE); text.setColor(Color.WHITE); text.setTextSize(22); }
+              public void point(float nx, float ny, String l) { targetX = nx; targetY = ny; label = l == null ? "ACTION" : l; invalidate(); }
+              @Override protected void onDraw(Canvas c) {
+                  x += (targetX - x) * 0.15f; y += (targetY - y) * 0.15f; long t = System.currentTimeMillis(); float pulse = (float)(0.5 + 0.5 * Math.sin(t / 150.0));
+                  int mainCol = theme.getMainColor();
+                  p.setShader(new RadialGradient(x, y, 180 + pulse * 30, Color.argb(90, Color.red(mainCol), Color.green(mainCol), Color.blue(mainCol)), Color.TRANSPARENT, Shader.TileMode.CLAMP)); c.drawCircle(x, y, 180 + pulse * 30, p); p.setShader(null);
+                  p.setColor(0xFF000000); c.drawCircle(x, y, 65, p); p.setColor(mainCol); c.drawCircle(x, y, 25 + pulse * 15, p);
+                  stroke.setColor(Color.WHITE); stroke.setStrokeWidth(4); c.save(); c.rotate((t / 15) % 360, x, y); c.drawOval(new RectF(x - 100, y - 40, x + 100, y + 40), stroke); c.restore();
+                  c.save(); c.rotate(-(t / 10) % 360, x, y); c.drawOval(new RectF(x - 40, y - 110, x + 40, y + 110), stroke); c.restore();
+                  p.setColor(Color.argb(220, 5, 5, 5)); RectF box = new RectF(x - 120, y + 80, x + 120, y + 120); c.drawRoundRect(box, 10, 10, p);
+                  stroke.setColor(mainCol); stroke.setStrokeWidth(2); c.drawRoundRect(box, 10, 10, stroke);
+                  text.setTextAlign(Paint.Align.CENTER); c.drawText(label.length() > 25 ? label.substring(0, 25) : label, x, y + 108, text);
+                  postInvalidateDelayed(16);
+              }
+          }
+          EOF
+
+          cat > app/src/main/java/com/lml/robotai/ChainOfThought.java <<'EOF'
+          package com.lml.robotai;
+          public class ChainOfThought {
+              public interface CotCallback { void onStep(String log); }
+              public void process(String command, CotCallback cb) {
+                  new Thread(() -> {
+                      try {
+                          cb.onStep("<font color='#AAAAAA'>[CoT] System Init...</font>"); Thread.sleep(200);
+                          cb.onStep("<font color='#00FFFF'>[CoT] -> Validation Exec</font>");
+                      } catch (InterruptedException ignored) {}
+                  }).start();
+              }
+          }
+          EOF
+
+          cat > app/src/main/java/com/lml/robotai/FloatingRobotService.java <<'EOF'
+          package com.lml.robotai;
+          import android.app.Service; import android.content.Context; import android.content.Intent; import android.graphics.Color; import android.graphics.PixelFormat; import android.graphics.drawable.GradientDrawable; import android.os.Handler; import android.os.IBinder; import android.os.Looper; import android.text.Html; import android.view.Gravity; import android.view.MotionEvent; import android.view.WindowManager; import android.view.inputmethod.InputMethodManager; import android.widget.Button; import android.widget.EditText; import android.widget.LinearLayout; import android.widget.TextView; import android.widget.ScrollView; import android.widget.Toast; import java.util.ArrayList; import java.util.List;
+          public class FloatingRobotService extends Service {
+              private WindowManager wm; private RobotView robot; private MapOverlayView map; private LinearLayout panel;
+              private TextView report; private EditText chatInput; private ScrollView logScroll;
+              private RobotThemeManager theme; private AgiNetworkManager networkManager; private SkillManager skillManager;
+              private NeuralSwarm neuralSwarm; private AgiActionManager actionManager; private SystemMonitor monitor; private ChainOfThought cot;
+              private Handler mainHandler; private float dx, dy; private int px, py; private boolean minimized = true;
+              private List<ScreenNode> lastNodes = new ArrayList<>(); private List<ScreenNode> pendingSnapDeletes = new ArrayList<>();
+              
+              private boolean isEmergencyStop = false;
+              private String agentGoal = null;
+              private List<String> agentHistory = new ArrayList<>();
+
+              @Override public IBinder onBind(Intent i) { return null; }
+
+              @Override public void onCreate() {
+                  theme = new RobotThemeManager(this); networkManager = new AgiNetworkManager(); skillManager = new SkillManager(this); cot = new ChainOfThought();
+                  neuralSwarm = new NeuralSwarm(); actionManager = new AgiActionManager(this); monitor = new SystemMonitor(this);
+                  mainHandler = new Handler(Looper.getMainLooper()); wm = (WindowManager)getSystemService(WINDOW_SERVICE);
+                  setupRobotOverlay(); setupControlPanel(); startLoops();
+              }
+
+              private void setupRobotOverlay() {
+                  WindowManager.LayoutParams full = new WindowManager.LayoutParams(-1, -1, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, PixelFormat.TRANSLUCENT);
+                  full.alpha = 0.8f; map = new MapOverlayView(this); robot = new RobotView(this); 
+                  map.setVisibility(android.view.View.GONE); robot.setVisibility(android.view.View.GONE);
+                  wm.addView(map, full); wm.addView(robot, full);
+              }
+
+              private void setupControlPanel() {
+                  panel = new LinearLayout(this); panel.setOrientation(LinearLayout.VERTICAL); panel.setPadding(15,15,15,15); panel.setBackground(bg(theme.getBgColor(), theme.getMainColor(), 25));
+                  LinearLayout header = new LinearLayout(this); header.setOrientation(LinearLayout.HORIZONTAL);
+                  TextView title = new TextView(this); title.setText("V42 TITAN PHOENIX"); title.setTextColor(theme.getMainColor()); title.setTextSize(13); title.setTypeface(null, android.graphics.Typeface.BOLD); header.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
                   
-                  CharSequence textSeq = node.getText();
-                  if (textSeq != null) {
-                      String text = textSeq.toString().toUpperCase();
+                  header.addView(btn("STOP", 0xFFFF0000, v -> triggerPanic()), new LinearLayout.LayoutParams(80, -2)); 
+                  header.addView(btn("—", 0xFFFFFFFF, v -> togglePanel()), new LinearLayout.LayoutParams(80, -2)); 
+                  header.addView(btn("X", 0xFFFF3333, v -> stopSelf()), new LinearLayout.LayoutParams(80, -2)); panel.addView(header);
+                  
+                  logScroll = new ScrollView(this); logScroll.setTag("ui"); report = new TextView(this); report.setTextColor(0xFFCCCCCC); report.setTextSize(12); logScroll.addView(report); panel.addView(logScroll, new LinearLayout.LayoutParams(-1, 400));
+                  
+                  LinearLayout chatBar = new LinearLayout(this); chatBar.setOrientation(LinearLayout.HORIZONTAL); chatBar.setTag("ui"); chatBar.setPadding(0, 10, 0, 0);
+                  chatInput = new EditText(this); chatInput.setHint("Demande moi d'agir..."); chatInput.setTextColor(Color.WHITE); chatInput.setHintTextColor(0xFF666666); chatInput.setBackground(bg(0xFF111111, theme.getMainColor(), 10));
+                  chatInput.setOnTouchListener((v, e) -> { if (e.getAction() == MotionEvent.ACTION_UP) forceKeyboard(); return false; });
+                  chatBar.addView(chatInput, new LinearLayout.LayoutParams(0, -2, 1));
+                  chatBar.addView(btn("ENVOYER", theme.getMainColor(), v -> parseAndRun()), new LinearLayout.LayoutParams(120, -2));
+                  panel.addView(chatBar);
+
+                  WindowManager.LayoutParams pp = new WindowManager.LayoutParams(650, -2, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT);
+                  pp.gravity = Gravity.TOP | Gravity.START; pp.x = 20; pp.y = 100;
+                  panel.setOnTouchListener((v,e)->{ if(e.getAction()==MotionEvent.ACTION_DOWN) { px=pp.x; py=pp.y; dx=e.getRawX(); dy=e.getRawY(); return false; } if(e.getAction()==MotionEvent.ACTION_MOVE) { pp.x=px+(int)(e.getRawX()-dx); pp.y=py+(int)(e.getRawY()-dy); wm.updateViewLayout(panel,pp); return false; } return false; });
+                  wm.addView(panel, pp); updatePanelVisibility();
+                  chatLog("<font color='#00FFFF'><b>TITAN:</b> Système PHOENIX prêt. Tape 'tiktok auto' pour lancer le script TikTok.</font>");
+              }
+              
+              private void triggerPanic() {
+                  isEmergencyStop = true; mainHandler.removeCallbacksAndMessages(null); pendingSnapDeletes.clear(); 
+                  agentGoal = null; agentHistory.clear(); SafetyGuard.bypassForSafeMode = false;
+                  robot.setVisibility(android.view.View.GONE); map.setVisibility(android.view.View.GONE);
+                  chatLog("<font color='#FF0000'><b>[TITAN]: ARRÊT D'URGENCE COMPLET.</b></font>"); Toast.makeText(this, "TITAN: STOP", Toast.LENGTH_SHORT).show(); startLoops();
+              }
+
+              private void togglePanel() { minimized = !minimized; WindowManager.LayoutParams pp = (WindowManager.LayoutParams) panel.getLayoutParams(); if (!minimized) { pp.flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE; pp.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL; } else { pp.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE; hideKeyboard(); map.setVisibility(android.view.View.GONE); robot.setVisibility(android.view.View.GONE); map.setBoxes(false); } wm.updateViewLayout(panel, pp); updatePanelVisibility(); }
+              private void updatePanelVisibility() { for (int i = 0; i < panel.getChildCount(); i++) { android.view.View c = panel.getChildAt(i); if ("ui".equals(c.getTag())) c.setVisibility(minimized ? android.view.View.GONE : android.view.View.VISIBLE); } }
+              private void forceKeyboard() { if (chatInput != null) { chatInput.requestFocus(); InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE); if (imm != null) imm.showSoftInput(chatInput, InputMethodManager.SHOW_IMPLICIT); } }
+              private void hideKeyboard() { if (chatInput != null) { InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE); if (imm != null) imm.hideSoftInputFromWindow(chatInput.getWindowToken(), 0); } }
+              
+              private void doScan() { LmlAccessibilityService s = LmlAccessibilityService.INSTANCE; if (s == null) { chatLog("<font color='#FF3333'>[ERR] Accessibilité inactive.</font>"); return; } map.setVisibility(android.view.View.VISIBLE); lastNodes = s.scan(); map.setBoxes(true); map.setNodes(lastNodes); }
+
+              private void parseAndRun() {
+                  isEmergencyStop = false;
+                  String fullCmd = chatInput.getText().toString().trim(); if(fullCmd.isEmpty()) return; 
+                  hideKeyboard(); chatInput.setText(""); robot.point(500, 500, "Reflexion");
+                  chatLog("<font color='#FFFFFF'><b>MOI:</b> " + fullCmd + "</font>");
+                  
+                  String lcmd = fullCmd.toLowerCase();
+                  
+                  if (agentGoal != null && !lcmd.startsWith("auto") && !lcmd.startsWith("agent")) {
+                      agentGoal = agentGoal + " (Note utilisateur: " + fullCmd + ")";
+                      chatLog("<font color='#9D00FF'>[TITAN]: Info reçue, je continue en m'adaptant...</font>");
+                      runAgentLoop(); return;
+                  }
+
+                  String skillExpanded = skillManager.getSkill(lcmd);
+                  if (skillExpanded != null) { chatLog("<font color='#9D00FF'>[SKILL] Déploiement: " + skillExpanded + "</font>"); fullCmd = skillExpanded; lcmd = skillExpanded.toLowerCase(); }
+                  
+                  boolean isComplex = !lcmd.startsWith("clique") && !lcmd.startsWith("scroll") && !lcmd.startsWith("lance") && !lcmd.startsWith("recherche web") && !lcmd.startsWith("github") && !lcmd.contains(" puis ") && !lcmd.startsWith("preparer") && !lcmd.startsWith("valider") && !lcmd.startsWith("apprends") && !lcmd.contains("tiktok");
+                  if (lcmd.startsWith("auto ") || lcmd.startsWith("agent ") || isComplex) {
+                      agentGoal = fullCmd.replace("auto ", "").replace("agent ", "").trim(); agentHistory.clear();
+                      chatLog("<font color='#9D00FF'><b>[TITAN PHOENIX] Je prends le contrôle. Objectif : " + agentGoal + "</b></font>");
+                      runAgentLoop(); return;
+                  }
+
+                  final String finalCmd = fullCmd;
+                  cot.process(finalCmd, step -> mainHandler.post(() -> { if (step.contains("Validation Exec")) executeCommand(finalCmd); }));
+              }
+
+              // 🧠 CERVEAU PHOENIX (Auto-Correction)
+              private void runAgentLoop() {
+                  if (isEmergencyStop || agentGoal == null) return;
+                  doScan(); String mapContext = ScreenAnalyzer.exportCognitiveMap(lastNodes);
+                  String hist = agentHistory.isEmpty() ? "Aucune action" : String.join(" -> ", agentHistory);
+                  
+                  boolean isStuck = agentHistory.size() >= 2 && agentHistory.get(agentHistory.size()-1).equals(agentHistory.get(agentHistory.size()-2));
+                  String stuckWarning = isStuck ? "⚠️ ALERTE: L'action précédente a ÉCHOUÉ (l'écran n'a pas changé). Tu DOIS ABSOLUMENT CHANGER DE STRATÉGIE (ex: scroller, faire retour, ou 'parle' pour m'appeler à l'aide). " : "";
+                  
+                  String prompt = "Tu es TITAN V42, une AGI auto-correctrice absolue. Ton OBJECTIF est: '" + agentGoal + "'.\n" +
+                                  "HISTORIQUE: " + hist + ".\n" + stuckWarning + 
+                                  "REGLES: 1) Utilise la Vision par ID (ex: clique id 5). 2) Auto-corrige-toi si tu es bloqué. " +
+                                  "3) Utilise 'parle [msg]' pour m'appeler à l'aide en dernier recours. " +
+                                  "RÉPONDS STRICTEMENT DANS CE FORMAT:\n" +
+                                  "PENSEE: [Évalue ton action précédente, et explique ta nouvelle stratégie]\n" +
+                                  "COMMANDE: [UNE SEULE commande parmi: clique id [X], lance [app], recherche web '[req]', ecris '[txt]' dans [champ], scroll bas, scroll haut, parle '[msg]', apprends [nom]=[code], github '[demande]', retour, accueil, ou DONE]\n\n" + mapContext;
+                  
+                  robot.setVisibility(android.view.View.VISIBLE);
+                  networkManager.sendPrompt("SYSTEME", prompt, (answer, success) -> {
+                      mainHandler.post(() -> {
+                          if (!success || isEmergencyStop) { agentGoal = null; robot.setVisibility(android.view.View.GONE); map.setVisibility(android.view.View.GONE); chatLog("<font color='#FF3333'><b>TITAN:</b> Erreur IA.</font>"); return; }
+                          
+                          String pensee = "Je réfléchis..."; String commande = "done";
+                          try {
+                              String[] parts = answer.split("COMMANDE:");
+                              if(parts.length > 1) { pensee = parts[0].replace("PENSEE:", "").replace("PENSÉE:", "").trim(); commande = parts[1].trim(); } 
+                              else { commande = answer.trim(); }
+                          } catch(Exception e) { commande = answer; }
+
+                          String nextCmd = commande.toLowerCase().replace("\n", "");
+                          if (nextCmd.contains("done") || nextCmd.equals("fini")) { 
+                              chatLog("<font color='#00FF00'><b>TITAN:</b> 🏁 Objectif Atteint. (" + pensee + ")</font>"); 
+                              agentGoal = null; robot.setVisibility(android.view.View.GONE); map.setVisibility(android.view.View.GONE); 
+                          } 
+                          else { 
+                              agentHistory.add(nextCmd); if(agentHistory.size() > 5) agentHistory.remove(0); 
+                              if(isStuck) chatLog("<font color='#FF6600'><i>⚠️ Correction en cours...</i></font>");
+                              chatLog("<font color='#AAAAAA'><i>💭 " + pensee + "</i></font>"); 
+                              List<String> steps = new ArrayList<>(); steps.add(nextCmd); executeStepsSequentially(steps, 0); 
+                          }
+                      });
+                  });
+              }
+
+              // 🤖 SÉQUENCE TIKTOK
+              private void executeTiktokSequence(int count) {
+                  if (isEmergencyStop) return;
+                  
+                  doScan();
+                  
+                  ScreenNode targetBtn = neuralSwarm.findByText(lastNodes, "suivre"); 
+                  if (targetBtn == null) targetBtn = neuralSwarm.findByText(lastNodes, "ami");
+                  if (targetBtn == null) targetBtn = neuralSwarm.findByText(lastNodes, "abonner");
+
+                  if (targetBtn != null && targetBtn.clickable) {
+                      chatLog("<font color='#00FFFF'>[TIKTOK] Clic sur: " + targetBtn.label() + "</font>");
+                      LmlAccessibilityService.INSTANCE.tap(targetBtn.cx(), targetBtn.cy());
+                      robot.point(targetBtn.cx(), targetBtn.cy(), "Clic TikTok");
                       
-                      if (text.contains("+0.75")) {
-                          gagnerTrade();
-                          cliquerSurBouton(getRootInActiveWindow(), "CONTINUE"); 
-                          return true;
-                      }
-                      if (text.contains("-1C") || text.contains("-1.0")) {
-                          perdreTrade();
-                          cliquerSurBouton(getRootInActiveWindow(), "CONTINUE"); 
-                          return true;
-                      }
-                  }
-                  
-                  for (int i = 0; i < node.getChildCount(); i++) {
-                      if (verifierPopUpFinDeTrade(node.getChild(i))) return true;
-                  }
-                  return false;
-              }
-
-              private void chercherPrixEtAnalyser(AccessibilityNodeInfo node, AccessibilityNodeInfo root) {
-                  if (node == null) return;
-                  
-                  if (node.getClassName() != null && node.getClassName().toString().equals("android.widget.TextView")) {
-                      CharSequence textSeq = node.getText();
-                      if (textSeq != null) {
-                          String text = textSeq.toString().trim().replace(",", ""); 
-                          if (text.matches("^[0-9]+(\\.[0-9]+)?$")) { 
-                              try {
-                                  double currentPrice = Double.parseDouble(text);
-                                  if (currentPrice > 1000) { 
-                                      analyserMomentum(currentPrice, root);
-                                      lastUpdateTime = System.currentTimeMillis();
-                                      return;
-                                  }
-                              } catch (Exception e) {}
-                          }
-                      }
-                  }
-                  for (int i = 0; i < node.getChildCount(); i++) {
-                      chercherPrixEtAnalyser(node.getChild(i), root);
-                  }
-                  node.recycle();
-              }
-
-              private void analyserMomentum(double currentPrice, AccessibilityNodeInfo root) {
-                  if (lastPrice == 0.0) { lastPrice = currentPrice; return; }
-                  double diff = currentPrice - lastPrice;
-
-                  if (diff > seuilMomentum) {
-                      if (cliquerSurBouton(root, "ACHETER")) { 
-                          enPosition = true; prixEntree = currentPrice; typeTrade = "ACHETER";
-                          mettreAJourHUD("ACHAT (Trade en cours...)", currentPrice);
-                      }
-                  } else if (diff < -seuilMomentum) {
-                      if (cliquerSurBouton(root, "VENDRE")) { 
-                          enPosition = true; prixEntree = currentPrice; typeTrade = "VENDRE";
-                          mettreAJourHUD("VENTE (Trade en cours...)", currentPrice);
-                      }
+                      mainHandler.postDelayed(() -> {
+                          scrollTiktokList();
+                          mainHandler.postDelayed(() -> executeTiktokSequence(count + 1), 2000);
+                      }, 1500);
+                      
                   } else {
-                      mettreAJourHUD("SCAN...", currentPrice);
+                      chatLog("<font color='#AAAAAA'>[TIKTOK] Scan vide, scroll bas...</font>");
+                      scrollTiktokList();
+                      mainHandler.postDelayed(() -> executeTiktokSequence(count), 2000);
+                  }
+              }
+
+              private void scrollTiktokList() {
+                  int w = getResources().getDisplayMetrics().widthPixels;
+                  int h = getResources().getDisplayMetrics().heightPixels;
+                  LmlAccessibilityService.INSTANCE.swipe(w / 2, (int)(h * 0.75), w / 2, (int)(h * 0.3));
+              }
+
+              private void executeCommand(String q) {
+                  String lcmd = q.toLowerCase();
+                  
+                  // DÉCLENCHEUR TIKTOK
+                  if (lcmd.contains("tiktok auto") || lcmd.contains("nettoyage tiktok") || lcmd.contains("farm tiktok")) {
+                      chatLog("<font color='#9D00FF'><b>[LML TIKTOK] SÉQUENCE AUTO DÉMARRÉE.</b></font>");
+                      SafetyGuard.bypassForSafeMode = true; 
+                      panel.setVisibility(android.view.View.GONE);
+                      robot.setVisibility(android.view.View.VISIBLE);
+                      executeTiktokSequence(0); 
+                      return;
                   }
                   
-                  lastPrice = currentPrice;
-              }
-
-              private void gagnerTrade() {
-                  capitalSimule += 0.70; 
-                  if (seuilMomentum > 5.0) seuilMomentum -= 0.5; 
-              }
-
-              private void perdreTrade() {
-                  capitalSimule -= 1.00; 
-                  seuilMomentum += 1.0; 
-              }
-
-              private boolean cliquerSurBouton(AccessibilityNodeInfo node, String texteRecherche) {
-                  if (node == null) return false;
-                  CharSequence text = node.getText();
-                  CharSequence contentDesc = node.getContentDescription();
-                  
-                  if ((text != null && text.toString().toUpperCase().contains(texteRecherche)) ||
-                      (contentDesc != null && contentDesc.toString().toUpperCase().contains(texteRecherche))) {
-                      if (node.isClickable()) {
-                          node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                          return true;
-                      } else if (node.getParent() != null && node.getParent().isClickable()) {
-                          node.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                          return true;
+                  if (lcmd.startsWith("apprends ")) {
+                      String[] parts = q.substring(9).split("=", 2);
+                      if (parts.length == 2) { skillManager.saveSkill(parts[0].trim(), parts[1].trim()); chatLog("<font color='#00FF00'>[AUTO-INJECTION] Skill '" + parts[0].trim() + "' enregistré !</font>"); } 
+                      if(agentGoal != null) mainHandler.postDelayed(this::runAgentLoop, 2000); return;
+                  }
+                  if (lcmd.startsWith("github ")) {
+                      String feature = q.replace("github ", "").replace("\"", "").replace("'", "").trim();
+                      GithubUplink.triggerBuild(feature); chatLog("<font color='#9D00FF'><b>[AUTO-ÉVOLUTION]</b> Demande envoyée à GitHub: " + feature + "</font>");
+                      if(agentGoal != null) mainHandler.postDelayed(this::runAgentLoop, 4000); return;
+                  }
+                  if (lcmd.contains("preparer") || lcmd.contains("prepare")) {
+                      doScan(); pendingSnapDeletes.clear(); StringBuilder sb = new StringBuilder(); int screenH = getResources().getDisplayMetrics().heightPixels; int headerThreshold = (int)(screenH * 0.15); 
+                      for (ScreenNode n : lastNodes) { 
+                          String nameOnly = (n.text + " " + n.desc).trim().toLowerCase(); boolean isExcluded = nameOnly.isEmpty() || nameOnly.length() <= 2 || nameOnly.contains("recherche") || nameOnly.contains("trouver") || nameOnly.contains("amis") || nameOnly.contains("ami") || nameOnly.contains("retour") || nameOnly.contains("flèche") || nameOnly.contains("navigate") || nameOnly.contains("carte") || nameOnly.contains("story") || nameOnly.contains("chat") || nameOnly.contains("ajouter") || nameOnly.contains("nouveau") || nameOnly.contains("profil") || nameOnly.contains("paramètre") || nameOnly.contains("réglage") || nameOnly.contains("lml");
+                          if (!isExcluded && n.bounds.top > headerThreshold) { boolean alreadyAdded = false; for(ScreenNode p : pendingSnapDeletes) { if((p.text+" "+p.desc).trim().equals((n.text+" "+n.desc).trim())) { alreadyAdded = true; break; } } if(!alreadyAdded) { pendingSnapDeletes.add(n); String disp = n.text.isEmpty() ? n.desc : n.text; if(disp.length() > 25) disp = disp.substring(0, 25); sb.append("- ").append(disp).append("<br>"); } } 
                       }
+                      if (pendingSnapDeletes.isEmpty()) { chatLog("<font color='#FF3333'>[SAFE] Aucun profil détecté.</font>"); map.setVisibility(android.view.View.GONE); return; }
+                      chatLog("<font color='#00FFFF'><b>[LML SAFE] FILE D'ATTENTE :</b></font><br>" + sb.toString()); mainHandler.postDelayed(() -> { map.setVisibility(android.view.View.GONE); }, 3000); return;
                   }
+                  if (lcmd.contains("valider") || lcmd.contains("suppression") || lcmd.contains("supprimer")) {
+                      if (pendingSnapDeletes.isEmpty()) { chatLog("<font color='#FF3333'>[SAFE] File d'attente vide.</font>"); return; }
+                      chatLog("<font color='#FF3333'><b>[LML SAFE] DÉBUT DU NETTOYAGE. NE TOUCHEZ PLUS L'ÉCRAN.</b></font>"); SafetyGuard.bypassForSafeMode = true; panel.setVisibility(android.view.View.GONE); robot.setVisibility(android.view.View.GONE); map.setVisibility(android.view.View.GONE); executeSnapCleanSequence(0); return;
+                  }
+
+                  robot.setVisibility(android.view.View.VISIBLE);
+                  List<String> steps = AgiIntentParser.parseSequence(q); executeStepsSequentially(steps, 0);
+              }
+
+              private void executeSnapCleanSequence(int index) {
+                  if (isEmergencyStop) return;
+                  if (index >= pendingSnapDeletes.size()) { chatLog("<font color='#00FFFF'>[SYS] Terminé.</font>"); pendingSnapDeletes.clear(); SafetyGuard.bypassForSafeMode = false; panel.setVisibility(android.view.View.VISIBLE); return; }
+                  ScreenNode target = pendingSnapDeletes.get(index); String targetName = target.text.isEmpty() ? target.desc : target.text; chatLog("<font color='#FFD700'>Suppression: " + targetName + "</font>"); LmlAccessibilityService.INSTANCE.longPress(target.cx(), target.cy());
+                  mainHandler.postDelayed(() -> { 
+                      List<ScreenNode> tempNodes = LmlAccessibilityService.INSTANCE.scan(); ScreenNode mNode = neuralSwarm.findByText(tempNodes, "gérer"); if (mNode == null) mNode = neuralSwarm.findByText(tempNodes, "amitié"); if (mNode == null) mNode = neuralSwarm.findByText(tempNodes, "amiti"); 
+                      if (mNode != null) { 
+                          LmlAccessibilityService.INSTANCE.tap(mNode.cx(), mNode.cy()); 
+                          mainHandler.postDelayed(() -> { 
+                              List<ScreenNode> tempNodes2 = LmlAccessibilityService.INSTANCE.scan(); ScreenNode rNode = neuralSwarm.findByText(tempNodes2, "supprimer"); if (rNode == null) rNode = neuralSwarm.findByText(tempNodes2, "retirer"); 
+                              if (rNode != null) { 
+                                  LmlAccessibilityService.INSTANCE.tap(rNode.cx(), rNode.cy()); 
+                                  mainHandler.postDelayed(() -> { 
+                                      mainHandler.postDelayed(() -> {
+                                          List<ScreenNode> tempNodes3 = LmlAccessibilityService.INSTANCE.scan(); boolean clickedExact = false;
+                                          for (ScreenNode n : tempNodes3) { String txt = n.text.toLowerCase().trim(); String desc = n.desc.toLowerCase().trim(); if ((txt.equals("supprimer") || desc.equals("supprimer") || txt.equals("oui") || desc.equals("oui")) && n.clickable) { LmlAccessibilityService.INSTANCE.tap(n.cx(), n.cy()); clickedExact = true; break; } }
+                                          if (!clickedExact) { for (ScreenNode n : tempNodes3) { String txt = n.text.toLowerCase().trim(); if ((txt.contains("supprimer") || txt.contains("retirer")) && txt.length() < 12) { LmlAccessibilityService.INSTANCE.tap(n.cx(), n.cy()); clickedExact = true; break; } } }
+                                          if (!clickedExact) { int sw = getResources().getDisplayMetrics().widthPixels; int sh = getResources().getDisplayMetrics().heightPixels; int targetX = sw / 2; int y1 = (int)(sh * 0.54); int y2 = (int)(sh * 0.58); int y3 = (int)(sh * 0.62); LmlAccessibilityService.INSTANCE.tap(targetX, y1); mainHandler.postDelayed(() -> LmlAccessibilityService.INSTANCE.tap(targetX, y2), 150); mainHandler.postDelayed(() -> LmlAccessibilityService.INSTANCE.tap(targetX, y3), 300); }
+                                          mainHandler.postDelayed(() -> executeSnapCleanSequence(index + 1), 3000);
+                                      }, 800); 
+                                  }, 1500); 
+                              } else { LmlAccessibilityService.INSTANCE.tap(10, 10); mainHandler.postDelayed(() -> executeSnapCleanSequence(index + 1), 2000); }
+                          }, 2500); 
+                      } else { LmlAccessibilityService.INSTANCE.tap(10, 10); mainHandler.postDelayed(() -> executeSnapCleanSequence(index + 1), 2000); }
+                  }, 3000); 
+              }
+
+              private void executeStepsSequentially(List<String> steps, int index) {
+                  if (isEmergencyStop) return;
+                  if (index >= steps.size()) { 
+                      if (agentGoal != null) { mainHandler.postDelayed(this::runAgentLoop, 5000); } 
+                      else { robot.setVisibility(android.view.View.GONE); map.setVisibility(android.view.View.GONE); } return; 
+                  }
+                  String q = steps.get(index); int w = getResources().getDisplayMetrics().widthPixels; int h = getResources().getDisplayMetrics().heightPixels; int delay = 2000; 
                   
-                  for (int i = 0; i < node.getChildCount(); i++) {
-                      if (cliquerSurBouton(node.getChild(i), texteRecherche)) return true;
+                  if (q.startsWith("parle ")) { String msg = q.replace("parle ", "").replace("\"", "").replace("'", "").trim(); chatLog("<font color='#00FF00'><b>TITAN:</b> " + msg + "</font>"); robot.setVisibility(android.view.View.GONE); return; }
+                  else if (q.startsWith("recherche web ")) { String query = AgiIntentParser.extractQuoteArgument(q); if (query == null) query = q.replace("recherche web ", "").trim(); Intent intent = new Intent(Intent.ACTION_WEB_SEARCH); intent.putExtra(android.app.SearchManager.QUERY, query); intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(intent); delay = 4000; }
+                  else if (q.startsWith("github ")) { String feature = q.replace("github ", "").replace("\"", "").replace("'", "").trim(); GithubUplink.triggerBuild(feature); delay = 4000;}
+                  else if (q.startsWith("attends ") || q.startsWith("pause ")) { int seconds = 2; try { seconds = Integer.parseInt(q.replaceAll("[^0-9]", "")); } catch(Exception e){} delay = seconds * 1000; chatLog("⏳ Pause de " + seconds + "s..."); }
+                  else if (q.startsWith("clique id ")) { int id = -1; try { id = Integer.parseInt(q.replace("clique id ", "").trim()); } catch(Exception e){} doScan(); ScreenNode n = neuralSwarm.findById(lastNodes, id); if (n != null) { LmlAccessibilityService.INSTANCE.tap(n.cx(), n.cy()); robot.point(n.cx(), n.cy(), "Clic ID"); } }
+                  else if (q.startsWith("appui long sur ")) { doScan(); String target = q.replace("appui long sur ", "").trim(); ScreenNode n = neuralSwarm.findByText(lastNodes, target); if (n != null) { LmlAccessibilityService.INSTANCE.longPress(n.cx(), n.cy()); } }
+                  else if (q.startsWith("double clic sur ") || q.startsWith("double clique sur ")) { doScan(); String target = q.replace("double clic sur ", "").replace("double clique sur ", "").trim(); ScreenNode n = neuralSwarm.findByText(lastNodes, target); if (n != null) { LmlAccessibilityService.INSTANCE.tap(n.cx(), n.cy()); mainHandler.postDelayed(()->LmlAccessibilityService.INSTANCE.tap(n.cx(), n.cy()), 150); } }
+                  else if (q.contains("glisse") || q.contains("drag")) { LmlAccessibilityService.INSTANCE.dragAndDrop((int)(w*0.8), (int)(h*0.8), (int)(w*0.2), (int)(h*0.2)); }
+                  else if (q.contains("zoom in")) { LmlAccessibilityService.INSTANCE.pinchZoom(w/2, h/2, true); }
+                  else if (q.contains("zoom out")) { LmlAccessibilityService.INSTANCE.pinchZoom(w/2, h/2, false); }
+                  else if (q.contains("tiktok")) { actionManager.launchApp("tiktok"); delay = 4000;}
+                  else if (q.contains("whatsapp")) { actionManager.launchApp("whatsapp"); delay = 4000;}
+                  else if (q.contains("instagram") || q.contains("insta")) { actionManager.launchApp("instagram"); delay = 4000;}
+                  else if (q.contains("youtube")) { actionManager.launchApp("youtube"); delay = 4000;}
+                  else if (q.contains("ecris") || q.contains("écris")) {
+                      doScan(); String txt = AgiIntentParser.extractQuoteArgument(q); String box = q.replace("ecris", "").replace("écris", "").replace("dans", "").replace("sur", "").replace("\""+txt+"\"", "").replace("'"+txt+"'", "").trim();
+                      if (txt != null) { ScreenNode input = neuralSwarm.findInputByText(lastNodes, box); if (input == null) input = neuralSwarm.findByText(lastNodes, box); if (input != null) { LmlAccessibilityService.INSTANCE.tap(input.cx(), input.cy()); mainHandler.postDelayed(() -> { LmlAccessibilityService.INSTANCE.injectText(input, txt); }, 500); } }
                   }
-                  return false;
+                  else if (q.equals("retour") || q.contains("recul")) { LmlAccessibilityService.INSTANCE.goBack(); }
+                  else if (q.equals("accueil") || q.contains("home")) { LmlAccessibilityService.INSTANCE.goHome(); }
+                  else if (q.contains("scroll bas")) { LmlAccessibilityService.INSTANCE.swipe(w/2, (int)(h*0.8), w/2, (int)(h*0.2)); } 
+                  else if (q.contains("scroll haut")) { LmlAccessibilityService.INSTANCE.swipe(w/2, (int)(h*0.2), w/2, (int)(h*0.8)); }
+                  else if (q.startsWith("clique ") || q.startsWith("clic ") || q.startsWith("lance ")) {
+                      doScan(); String target = q.replace("clique ", "").replace("clic ", "").replace("sur ", "").replace("lance ", "").trim();
+                      ScreenNode n = neuralSwarm.findByText(lastNodes, target);
+                      if (n != null && (!n.danger || SafetyGuard.bypassForSafeMode)) { LmlAccessibilityService.INSTANCE.tap(n.cx(), n.cy()); } 
+                  } 
+                  mainHandler.postDelayed(() -> executeStepsSequentially(steps, index + 1), delay); 
               }
 
-              private void mettreAJourHUD(String signal, double currentPrice) {
-                  Intent intent = new Intent("COM_LML_TRADING_UPDATE");
-                  intent.putExtra("SIGNAL", signal);
-                  intent.putExtra("PRICE", String.valueOf(currentPrice));
-                  intent.putExtra("CAPITAL", String.format("%.2f", capitalSimule));
-                  intent.putExtra("SEUIL", String.format("%.2f", seuilMomentum));
-                  sendBroadcast(intent);
-              }
-
-              @Override
-              public void onInterrupt() {}
+              @SuppressWarnings("deprecation")
+              private void chatLog(String msg) { report.append(Html.fromHtml(msg + "<br><br>")); logScroll.post(() -> logScroll.fullScroll(android.view.View.FOCUS_DOWN)); }
+              private void startLoops() { mainHandler.postDelayed(new Runnable() { @Override public void run() { monitor.getTelemetry(); mainHandler.postDelayed(this, 5000); } }, 1000); }
+              private Button btn(String s, int c, android.view.View.OnClickListener l) { Button b = new Button(this); b.setText(s); b.setTextColor(Color.WHITE); b.setTextSize(10); b.setBackground(bg(0xFF151515, c, 10)); b.setOnClickListener(l); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(4,4,4,4); b.setLayoutParams(lp); return b; }
+              private GradientDrawable bg(int f, int s, int r) { GradientDrawable g = new GradientDrawable(); g.setColor(f); g.setCornerRadius(r); g.setStroke(2, s); return g; }
+              @Override public void onDestroy() { try { wm.removeView(panel); wm.removeView(robot); wm.removeView(map); mainHandler.removeCallbacksAndMessages(null); } catch(Exception e){} }
           }
           EOF
 
-          # TradingOverlayService.java
-          cat > app/src/main/java/com/lml/tradingbot/TradingOverlayService.java <<'EOF'
-          package com.lml.tradingbot;
-          import android.app.Service;
-          import android.os.IBinder;
-          import android.content.Intent;
-          import android.content.IntentFilter;
-          import android.content.BroadcastReceiver;
-          import android.content.Context;
-          import android.view.WindowManager;
-          import android.widget.TextView;
-          import android.graphics.PixelFormat;
-          import android.view.Gravity;
-          import android.graphics.Color;
+          cat > app/src/main/java/com/lml/robotai/MainActivity.java <<'EOF'
+          package com.lml.robotai;
+          import android.app.Activity; import android.content.Intent; import android.graphics.Color; import android.graphics.drawable.GradientDrawable; import android.net.Uri; import android.os.Bundle; import android.provider.Settings; import android.view.Gravity; import android.widget.Button; import android.widget.EditText; import android.widget.LinearLayout; import android.widget.ScrollView; import android.widget.TextView;
+          public class MainActivity extends Activity {
+              private RobotThemeManager theme; private SkillManager skillManager;
+              @Override protected void onCreate(Bundle b) {
+                  super.onCreate(b); theme = new RobotThemeManager(this); skillManager = new SkillManager(this);
+                  ScrollView scroll = new ScrollView(this); scroll.setBackgroundColor(0xFF000000);
+                  LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setPadding(40, 50, 40, 50); scroll.addView(root);
 
-          public class TradingOverlayService extends Service {
-              private WindowManager wm;
-              private TextView hud;
-              private SignalReceiver receiver;
+                  TextView title = new TextView(this); title.setText("LML V42 PHOENIX"); title.setTextColor(theme.getMainColor()); title.setTextSize(28); title.setTypeface(null, android.graphics.Typeface.BOLD); title.setGravity(Gravity.CENTER); root.addView(title);
+                  
+                  LinearLayout start = card("SYSTEM CORE");
+                  start.addView(btn("1. OVERLAY PERMISSION", 0xFF00FFFF, v -> startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())))));
+                  start.addView(btn("2. ACCESSIBILITY", 0xFF9D00FF, v -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))));
+                  start.addView(btn("3. BOOT TITAN AGENT", 0xFFFFD700, v -> startService(new Intent(this, FloatingRobotService.class))));
+                  root.addView(start);
 
-              @Override
-              public void onCreate() {
-                  super.onCreate();
-                  wm = (WindowManager) getSystemService(WINDOW_SERVICE);
-                  hud = new TextView(this);
-                  hud.setText("ION SNIPER: PRÊT");
-                  hud.setTextColor(Color.WHITE);
-                  hud.setTextSize(14f);
-                  hud.setBackgroundColor(Color.parseColor("#BB000000")); 
-                  hud.setPadding(15, 15, 15, 15);
+                  LinearLayout skillCard = card("SKILL BUILDER (V42)");
+                  EditText skillName = new EditText(this); skillName.setHint("Nom (ex: msg auto)"); skillName.setTextColor(Color.WHITE); skillName.setHintTextColor(0xFF666666);
+                  EditText skillSeq = new EditText(this); skillSeq.setHint("Ex: lance snap puis ecris \"salut\" dans recherche"); skillSeq.setTextColor(Color.WHITE); skillSeq.setHintTextColor(0xFF666666);
+                  TextView skillList = new TextView(this); skillList.setTextColor(0xFFCCCCCC); skillList.setTextSize(12); skillList.setPadding(0, 20, 0, 0);
+                  
+                  Runnable updateList = () -> { 
+                      StringBuilder sb = new StringBuilder("SKILLS ACTIVES:\n"); 
+                      for(String k : skillManager.getAll().keySet()) sb.append("⚡ ").append(k).append(" -> ").append(skillManager.getSkill(k)).append("\n"); 
+                      skillList.setText(sb.toString()); 
+                  }; updateList.run();
+                  
+                  skillCard.addView(skillName); skillCard.addView(skillSeq);
+                  LinearLayout skillBtns = new LinearLayout(this); skillBtns.setOrientation(LinearLayout.HORIZONTAL);
+                  skillBtns.addView(btn("SAVE", 0xFF9D00FF, v -> { skillManager.saveSkill(skillName.getText().toString(), skillSeq.getText().toString()); skillName.setText(""); skillSeq.setText(""); updateList.run(); }), new LinearLayout.LayoutParams(0,-2,1));
+                  skillBtns.addView(btn("PURGER", 0xFFFF3333, v -> { skillManager.clearSkills(); updateList.run(); }), new LinearLayout.LayoutParams(0,-2,1));
+                  skillCard.addView(skillBtns); skillCard.addView(skillList);
+                  root.addView(skillCard);
 
-                  WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                      WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
-                      WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                      WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT);
-                  params.gravity = Gravity.TOP | Gravity.START;
-                  params.y = 200; 
-                  wm.addView(hud, params);
+                  LinearLayout themes = card("LML AESTHETICS");
+                  themes.addView(btn("EDITION OR & NOIR", 0xFFFFD700, v -> updateTheme(RobotThemeManager.THEME_NOIR_OR)));
+                  themes.addView(btn("NEON CYAN", 0xFF00FFFF, v -> updateTheme(RobotThemeManager.THEME_NEON_CYAN)));
+                  themes.addView(btn("CYBER VIOLET", 0xFF9D00FF, v -> updateTheme(RobotThemeManager.THEME_CYBER_VIOLET)));
+                  root.addView(themes);
 
-                  receiver = new SignalReceiver();
-                  registerReceiver(receiver, new IntentFilter("COM_LML_TRADING_UPDATE"), Context.RECEIVER_EXPORTED);
+                  setContentView(scroll);
               }
-
-              @Override
-              public void onDestroy() {
-                  super.onDestroy();
-                  if (hud != null) wm.removeView(hud);
-                  if (receiver != null) unregisterReceiver(receiver);
+              private void updateTheme(int t) { theme.setTheme(t); recreate(); }
+              private LinearLayout card(String t) {
+                  LinearLayout c = new LinearLayout(this); c.setOrientation(LinearLayout.VERTICAL); c.setPadding(25, 25, 25, 25); c.setBackground(bg(0xFF0A0A0A, 0xFF333333, 20));
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, 20, 0, 20); c.setLayoutParams(lp);
+                  TextView txt = new TextView(this); txt.setText(t); txt.setTextColor(0xFF888888); txt.setPadding(0, 0, 0, 15); c.addView(txt); return c;
               }
-
-              @Override
-              public IBinder onBind(Intent intent) { return null; }
-
-              private class SignalReceiver extends BroadcastReceiver {
-                  @Override
-                  public void onReceive(Context context, Intent intent) {
-                      if (intent != null && "COM_LML_TRADING_UPDATE".equals(intent.getAction())) {
-                          String signal = intent.getStringExtra("SIGNAL");
-                          String price = intent.getStringExtra("PRICE");
-                          String capital = intent.getStringExtra("CAPITAL");
-                          String seuil = intent.getStringExtra("SEUIL");
-                          
-                          String texteAffichage = "BTCUSD: " + price + "\n" +
-                                                  "Action: " + signal + "\n" +
-                                                  "Capital: " + capital + "$\n" +
-                                                  "Volatilité Req: " + seuil + "$";
-                          hud.setText(texteAffichage);
-                          
-                          if (signal.contains("ACHAT")) hud.setTextColor(Color.GREEN);
-                          else if (signal.contains("VENTE")) hud.setTextColor(Color.RED);
-                          else hud.setTextColor(Color.WHITE);
-                      }
-                  }
+              private Button btn(String s, int c, android.view.View.OnClickListener l) {
+                  Button b = new Button(this); b.setText(s); b.setTextColor(Color.WHITE); b.setTextSize(12); b.setBackground(bg(0xFF151515, c, 12)); b.setOnClickListener(l);
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(4, 10, 4, 10); b.setLayoutParams(lp); return b;
               }
+              private GradientDrawable bg(int f, int s, int r) { GradientDrawable g = new GradientDrawable(); g.setColor(f); g.setCornerRadius(r); g.setStroke(3, s); return g; }
           }
           EOF
 
-          # settings.gradle CORRIGÉ (Ajout des dépôts Google et MavenCentral)
-          cat > settings.gradle <<'EOF'
-          pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          rootProject.name = "LML_XTREND_AGI"
-          include ':app'
+          cat > app/lml-stable.keystore.base64 <<'EOF'
+          MIIKLgIBAzCCCdgGCSqGSIb3DQEHAaCCCckEggnFMIIJwTCCBagGCSqGSIb3DQEHAaCCBZkEggWVMIIFkTCCBY0GCyqGSIb3DQEMCgECoIIFQDCCBTwwZgYJKoZIhvcNAQUNMFkwOAYJKoZIhvcNAQUMMCsEFIZbpNpUjvSZKFEOSDTUMFyAx+ZmAgInEAIBIDAMBggqhkiG9w0CCQUAMB0GCWCGSAFlAwQBKgQQF2d4Ks6UGqWlIPDGYJTnIASCBNCoT6WTQUKswEpEeX41TadjnRV0/HPiX8dLuTedVmYff+jZuzSqokRCu0t7rRGXt4lOG6DJauxuuhcie6Op2aTsimukJ6OZ7lyjidNxuiOIQHJy32L1Pe8g2DKWeAj/+uxmeaMq/v4pDa1V5W9KB56vsFSni5qEjF17V7RYiJKcBlC1iVMwq7V6KO7gl3nyHcMTiuGc5f9LDCpO+dJQFxeQ3+0bRALm04ycZPL6U/Xz9pDXP6wzJ6egpSOoXnx8G2mVYf8DzTTKABDXOn5SOdG/anEOHp/P7yNLA3QM5Y/CN/Bz5b8opRYBqqUBmSSCS1gYFbbYIDY5Z9aRRE8VUfnov1l8rmg50akocaQ1XgzH2M3Q6iuin1E82jK1lp+0Q42jzbLF1KSwoX/X56TZJ7/uz8pwUk92We0sdS9KrU/h7W36anqqtNCA2fpR7pXFQob1CK0bpB/IHwpmeeBXFH/ZCghPAKl+id+1GXxVI/V+8KPtLg2UAJWms/HGgHWYp499m4rztfUIQI/g9H6uYMRwCi27kF+yIWirkwdW9X2FK0RtVdAoRoMD9xai6C6X0Egiv9j1hVcDmF0QdytYQFlPfgDwpCVvqM3HmhJGmI3qgskqwnZCPZ7vZVHW0TGunp1OLORrpG2WkyDFZV1j3VaODog+QldP9+1CimohAd8xXmyEAGngxcx0RQQIQaIIjjH7Jis5Z5c8JXEiL3f1KRSWBFHRBbXjiHE/VQxVAj4Bf723u8CI8fyAxkPQtVPMmPgf753+WvnMof7eNcrNPhCKdnK/16eP18vaJYYTtiHHC9fI6Ypla8mA/6EFURw+Wc4etZIU5RwkDjkoVQ8m+MRROnr6ryXJrIluTSE8ZHzIaVIyuSRka2NFb/TtNgG1PpFEVvOJopTSV1yx/oDY1MZXDFdM/aGRaZzRKHde6GeCldm9WRbFUiisYCB4h6AAvBIZSNO0ZRvYfkEjmVNXhDmn4bzMsoRZd0lFdGQvZHI282rfBXXa+dxF1gn87alek+Yibfm4x6VlrI40XiZWXeFmfLlaRst7XmEChcDOgYtBiNBFPzNcSRR0hGv/dg+ys5h3acjhYm9SMYXcRGWHpP0HD7accaMsj1GgGt8se3Jx2AqD8wlTN2wfJY1IP9Z3OycDOtVa+bqhrQ4BOAn+6m23m7uteXXkvSRwNx4vsbZQw0mzM1MIi/ylNs5s1d+BGVH88AwM8LGTRP/QTorzPUd4Y+2VI9hdxFLkUbBfXeJLAUkjo2P78R/3rurUGKTSITcUwI1Tzke1ET2FlvOB1Xox6r+P6fgs4jEPE68tWR9DWZwnlZz5kfXDfD0h8C4+H0RUYi7Oc42QyQymVtuwRBCtBu2b8rYIwyC2Nc4YIE4XhNdcz9RdE16SzLSWt4JYaHTorN5iUZnWEaFE/et08/8nPo8h4FZp4DYif0G6lKYbVnkXEO85btgotvV0qYOLzmYBft/lzWM5NSnOVKzsTRd6MgxHQ2o+sJq4z4YyxSWszeWRbeKfjLV919bFpFsrIsQ+UFD0/74unSQMY72VjeXHJgp+99AM6A+hRAjtWblLQW34sQ0DEbqhBcE/uu4zixAJYpQbFUjXcVX7yqtwB2JdE+y7t03b1o9IN6uHWzcNYDE6MBUGCSqGSIb3DQEJFDEIHgYAbABtAGwwIQYJKoZIhvcNAQkVMRQEElRpbWUgMTc4MDg2NjY5NTYwOTCCBBEGCSqGSIb3DQEHBqCCBAIwggP+AgEAMIID9wYJKoZIhvcNAQcBMGYGCSqGSIb3DQEFDTBZMDgGCSqGSIb3DQEFDDArBBSdBs4JChlg7kIKGLpyN69q/KJgQwICJxACASAwDAYIKoZIhvcNAgkFADAdBglghkgBZQMEASoEEPw0Pjxp29pbTBx/OWthp9SAggOAc0Q9sGM68/exFIBlrIlqa182WI3G8Uhm3hMKr0G0fzCEr3SJbDyIUn5MBLOfQRyJPqeJzsAFZQ2ZxsjnK21hNCG7TFedT63J4NlKCuD/X6nuEYluMoVltke1zxtRvh6S025qJYhQ/c0ux649wgIPt2iWKebEzdrboYPtJ6Jlrikm4mytlYFGzqiDedTz/2djJIhgTvGp00Yr83OLV0z5AlDn6Y6Ph3TPr5YVvHMNhkfAe/q1v8i9YqmIPf+LfJj7lOwudYfRGiixS1nhrOk++Bxrx6JMbK4+7dSA6462hRyIHlrNV37+N6K2NeMUqR7jbm81gk359hXoqfa2udza6cXyAWYeBYpLPhg/OkJT9gNmmlO8GM5sfmfEY02drEOcq+t/ZXjnTDnfsBHuH0Z0l7ci6k7kPe4U7Sg3mqBCIZ543yv1ojJlwm6KZGB0TGGoapZ8rbLsJgpyEAexh5KCK5MiNDNI5TtDfv1Gjv6QHqtR4V87624Pd51QgX9jn3kQfmO5n9yNWs/KrVFjlTosRvxTEZ8dxfHPxNTJNi8/7r7o2YAkt0/hrNPf9oChnnR5ZM8ZihTdsfu7VewXUFz6GdxCntx6cKcXUY7EUXKFdRXaT2RNgj6CTqlh3ekD5mJaLXD1tMQPYbv8vkWuRCCZAFUiLB/2jCV7uVlh3fF0toUjMQ45T4aEQJrNy3MrgL/qD/AL+tWNKjMTjKBo8Oqk2n2oTt/26qxFWWY4e0Xu6ojGisvaJCCDdmmKwRrLwR12PC/NTUvMtUVurJ/97k3bfolUM3oPpQ9t9/Nb65mFT+Uta0eC3XL+H2UKSFdeS9xbaGO8mHlDc+xLmvVQdET6+WsfprcLklSt+yUT5KefFGe21+2Qlykgh1TDJHajIsw5FeYJROQT+C5dbBnEbmtH6U9Z8iry8n1nGaE8fxYyO+KRaaSbwU9det4J4Uld1EeFsPucfkzr5eUmwl1uW++ZSnK27WCoBduo/1b5fkg/PfB6hJiiW5PGx+H5+ZiWz+FLr1+znAKOTGSwxETiXQ9EKt1Nk47o1XRvIexajH/2lk4SMlXFSx5uDNFJZYEMPglEVVctGohWCxuQMLCLDwRY/9BVq78H8ZilZbGmMxgkwTt1L150m/xeIUDSGLoA/lb+M7ydWOFJasLEnIDfIRkfL3U43ryL7PFQ0r9kurdH5F4wTTAxMA0GCWCGSAFlAwQCAQUABCB1ih+FngnR0P7BLDNYvaXSQ2e5oyN6rBeGgxqEIJFMLwQUiPV0nL7Bs60a2fn6dwzJ0DDmCeMCAicQ
           EOF
+          base64 -d app/lml-stable.keystore.base64 > app/lml-stable.keystore
 
-          # app/build.gradle CORRIGÉ (Déclaration de la version exacte du plugin)
-          cat > app/build.gradle <<'EOF'
-          plugins { 
-              id 'com.android.application' version '8.1.0' 
-          }
-          android {
-              namespace 'com.lml.tradingbot'
-              compileSdk 34
-              defaultConfig {
-                  applicationId "com.lml.tradingbot"
-                  minSdk 33
-                  targetSdk 34
-                  versionCode 1
-                  versionName "1.0"
-              }
-              buildTypes {
-                  release {
-                      minifyEnabled false
-                  }
-              }
-          }
-          EOF
-
-      # 2. Utilisation de Gradle global pour générer le wrapper et compiler
-      - name: Build APK
+      - name: Install Android SDK
         run: |
-          gradle wrapper
-          ./gradlew assembleRelease --no-daemon
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-34" || true
+          sdkmanager "build-tools;34.0.0" || true
 
-      - name: Upload Artifact
+      - name: Build signed release APK
+        run: |
+          gradle assembleRelease --no-daemon
+
+      - name: Prepare APK files
+        run: |
+          VERSION="1.0.${GITHUB_RUN_NUMBER}"
+          mkdir -p release-apk
+          cp app/build/outputs/apk/release/app-release.apk "release-apk/LML-AGI-V42-TITAN-${VERSION}.apk"
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LML-XTREND-AGI-FINAL
-          path: app/build/outputs/apk/release/*.apk
+          name: LML-AGI-V42-TITAN-APK
+          path: release-apk/*.apk
 
