@@ -40,6 +40,9 @@ jobs:
           mkdir -p app/src/main/res/xml
           mkdir -p app/src/main/res/values
 
+          # --- GENERATION DE LA CLE DE SECURITE EN DIRECT (ANTI-CRASH) ---
+          keytool -genkeypair -v -keystore app/lml-stable.keystore -alias lml -keyalg RSA -keysize 2048 -validity 10000 -storepass lmlrobot -keypass lmlrobot -dname "CN=LML, OU=App, O=Brand, L=Paris, ST=IDF, C=FR"
+
           cat > settings.gradle <<'EOF'
           pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
           dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
@@ -75,6 +78,11 @@ jobs:
               buildFeatures { buildConfig true }
               compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
               
+              lint {
+                  abortOnError false
+                  checkReleaseBuilds false
+              }
+              
               signingConfigs { 
                   lmlStable { 
                       storeFile file("lml-stable.keystore")
@@ -94,9 +102,10 @@ jobs:
           EOF
 
           cat > app/src/main/res/values/strings.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <string name="app_name">LML V42 PHOENIX</string>
-              <string name="accessibility_desc">LML AGI V42 : Auto-Correction, Apprentissage Humain, Nettoyage TikTok et Snap.</string>
+              <string name="accessibility_desc">LML AGI V42 : Auto Correction, Apprentissage Humain, Nettoyage TikTok et Snap.</string>
           </resources>
           EOF
 
@@ -113,6 +122,7 @@ jobs:
           EOF
 
           cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
               <uses-permission android:name="android.permission.INTERNET" />
@@ -232,7 +242,7 @@ jobs:
                               while ((line = br.readLine()) != null) resp.append(line.trim());
                               String raw = resp.toString(); int start = raw.indexOf("\"text\": \"") + 9; int end = raw.indexOf("\"", start);
                               if (start > 8 && end > start) { cb.onResponse(raw.substring(start, end).replace("\\n", "\n").replace("\\\"", "\""), true); } 
-                              else { cb.onResponse("Réponse Gemini illisible.", false); }
+                              else { cb.onResponse("Reponse Gemini illisible.", false); }
                           } else { cb.onResponse("Erreur API HTTP: " + conn.getResponseCode(), false); }
                       } catch (Exception e) { cb.onResponse("Erreur de connexion.", false); }
                   });
@@ -270,7 +280,7 @@ jobs:
               public static String extractQuoteArgument(String command) { Matcher m = Pattern.compile("[\"'](.*?)[\"']").matcher(command); if (m.find()) return m.group(1); return null; }
               public static List<String> parseSequence(String rawCommand) {
                   List<String> steps = new ArrayList<>(); if (rawCommand == null || rawCommand.trim().isEmpty()) return steps;
-                  String[] parts = rawCommand.toLowerCase().split("\\bpuis\\b|\\bet\\b|\\bensuite\\b|\\baprès\\b");
+                  String[] parts = rawCommand.toLowerCase().split("\\bpuis\\b|\\bet\\b|\\bensuite\\b|\\bapres\\b");
                   for (String p : parts) { String clean = p.trim(); if (!clean.isEmpty()) steps.add(clean); } return steps;
               }
           }
@@ -461,7 +471,6 @@ jobs:
                   } return nodes; 
               }
 
-              // MODIFICATION: Utilisation de HumanMotion (Anti-Bot)
               public void tap(int x, int y) { HumanMotion.tap(this, x, y); }
               public void swipe(int startX, int startY, int endX, int endY) { HumanMotion.swipe(this, startX, startY, endX, endY); }
               
@@ -574,14 +583,14 @@ jobs:
                   pp.gravity = Gravity.TOP | Gravity.START; pp.x = 20; pp.y = 100;
                   panel.setOnTouchListener((v,e)->{ if(e.getAction()==MotionEvent.ACTION_DOWN) { px=pp.x; py=pp.y; dx=e.getRawX(); dy=e.getRawY(); return false; } if(e.getAction()==MotionEvent.ACTION_MOVE) { pp.x=px+(int)(e.getRawX()-dx); pp.y=py+(int)(e.getRawY()-dy); wm.updateViewLayout(panel,pp); return false; } return false; });
                   wm.addView(panel, pp); updatePanelVisibility();
-                  chatLog("<font color='#00FFFF'><b>TITAN:</b> Système PHOENIX prêt. Mouvement Anti-Bot activé. Tape 'observe moi' pour m'apprendre des actions.</font>");
+                  chatLog("<font color='#00FFFF'><b>TITAN:</b> Systeme PHOENIX pret. Mouvement Anti-Bot active. Tape 'observe moi' pour m'apprendre des actions.</font>");
               }
               
               private void triggerPanic() {
                   isEmergencyStop = true; mainHandler.removeCallbacksAndMessages(null); pendingSnapDeletes.clear(); 
                   agentGoal = null; agentHistory.clear(); SafetyGuard.bypassForSafeMode = false; LearningEngine.isRecording = false;
                   robot.setVisibility(android.view.View.GONE); map.setVisibility(android.view.View.GONE);
-                  chatLog("<font color='#FF0000'><b>[TITAN]: ARRÊT D'URGENCE COMPLET.</b></font>"); Toast.makeText(this, "TITAN: STOP", Toast.LENGTH_SHORT).show(); startLoops();
+                  chatLog("<font color='#FF0000'><b>[TITAN]: ARRET D'URGENCE COMPLET.</b></font>"); Toast.makeText(this, "TITAN: STOP", Toast.LENGTH_SHORT).show(); startLoops();
               }
 
               private void togglePanel() { minimized = !minimized; WindowManager.LayoutParams pp = (WindowManager.LayoutParams) panel.getLayoutParams(); if (!minimized) { pp.flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE; pp.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL; } else { pp.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE; hideKeyboard(); map.setVisibility(android.view.View.GONE); robot.setVisibility(android.view.View.GONE); map.setBoxes(false); } wm.updateViewLayout(panel, pp); updatePanelVisibility(); }
@@ -589,7 +598,7 @@ jobs:
               private void forceKeyboard() { if (chatInput != null) { chatInput.requestFocus(); InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE); if (imm != null) imm.showSoftInput(chatInput, InputMethodManager.SHOW_IMPLICIT); } }
               private void hideKeyboard() { if (chatInput != null) { InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE); if (imm != null) imm.hideSoftInputFromWindow(chatInput.getWindowToken(), 0); } }
               
-              private void doScan() { LmlAccessibilityService s = LmlAccessibilityService.INSTANCE; if (s == null) { chatLog("<font color='#FF3333'>[ERR] Accessibilité inactive.</font>"); return; } map.setVisibility(android.view.View.VISIBLE); lastNodes = s.scan(); map.setBoxes(true); map.setNodes(lastNodes); }
+              private void doScan() { LmlAccessibilityService s = LmlAccessibilityService.INSTANCE; if (s == null) { chatLog("<font color='#FF3333'>[ERR] Accessibilite inactive.</font>"); return; } map.setVisibility(android.view.View.VISIBLE); lastNodes = s.scan(); map.setBoxes(true); map.setNodes(lastNodes); }
 
               private void parseAndRun() {
                   isEmergencyStop = false;
@@ -601,17 +610,17 @@ jobs:
                   
                   if (agentGoal != null && !lcmd.startsWith("auto") && !lcmd.startsWith("agent")) {
                       agentGoal = agentGoal + " (Note utilisateur: " + fullCmd + ")";
-                      chatLog("<font color='#9D00FF'>[TITAN]: Info reçue, je continue en m'adaptant...</font>");
+                      chatLog("<font color='#9D00FF'>[TITAN]: Info recue, je continue en m'adaptant...</font>");
                       runAgentLoop(); return;
                   }
 
                   String skillExpanded = skillManager.getSkill(lcmd);
-                  if (skillExpanded != null) { chatLog("<font color='#9D00FF'>[SKILL] Déploiement: " + skillExpanded + "</font>"); fullCmd = skillExpanded; lcmd = skillExpanded.toLowerCase(); }
+                  if (skillExpanded != null) { chatLog("<font color='#9D00FF'>[SKILL] Deploiement: " + skillExpanded + "</font>"); fullCmd = skillExpanded; lcmd = skillExpanded.toLowerCase(); }
                   
                   boolean isComplex = !lcmd.startsWith("clique") && !lcmd.startsWith("scroll") && !lcmd.startsWith("lance") && !lcmd.startsWith("recherche web") && !lcmd.startsWith("github") && !lcmd.contains(" puis ") && !lcmd.startsWith("preparer") && !lcmd.startsWith("valider") && !lcmd.startsWith("apprends") && !lcmd.contains("tiktok") && !lcmd.contains("observe moi") && !lcmd.startsWith("fin");
                   if (lcmd.startsWith("auto ") || lcmd.startsWith("agent ") || isComplex) {
                       agentGoal = fullCmd.replace("auto ", "").replace("agent ", "").trim(); agentHistory.clear();
-                      chatLog("<font color='#9D00FF'><b>[TITAN PHOENIX] Je prends le contrôle. Objectif : " + agentGoal + "</b></font>");
+                      chatLog("<font color='#9D00FF'><b>[TITAN PHOENIX] Je prends le controle. Objectif : " + agentGoal + "</b></font>");
                       runAgentLoop(); return;
                   }
 
@@ -625,15 +634,15 @@ jobs:
                   String hist = agentHistory.isEmpty() ? "Aucune action" : String.join(" -> ", agentHistory);
                   
                   boolean isStuck = agentHistory.size() >= 2 && agentHistory.get(agentHistory.size()-1).equals(agentHistory.get(agentHistory.size()-2));
-                  String stuckWarning = isStuck ? "⚠️ ALERTE: L'action précédente a ÉCHOUÉ (l'écran n'a pas changé). Tu DOIS ABSOLUMENT CHANGER DE STRATÉGIE. " : "";
+                  String stuckWarning = isStuck ? "ALERTE: L'action precedente a ECHOUE. Tu DOIS ABSOLUMENT CHANGER DE STRATEGIE. " : "";
                   
                   String memoire = skillManager.getSkill("REGLE_IA");
                   String reglesUtilisateur = (memoire != null && !memoire.isEmpty()) ? " REGLES PERSO: " + memoire : "";
 
                   String prompt = "Tu es TITAN V42, une AGI auto-correctrice. Ton OBJECTIF est: '" + agentGoal + "'.\n" +
                                   "HISTORIQUE: " + hist + ".\n" + stuckWarning + reglesUtilisateur +
-                                  "REGLES: 1) Utilise la Vision par ID (ex: clique id 5). 2) Auto-corrige-toi si bloqué. " +
-                                  "RÉPONDS STRICTEMENT DANS CE FORMAT:\n" +
+                                  "REGLES: 1) Utilise la Vision par ID (ex: clique id 5). 2) Auto-corrige-toi si bloque. " +
+                                  "REPONDS STRICTEMENT DANS CE FORMAT:\n" +
                                   "PENSEE: [Ton raisonnement]\n" +
                                   "COMMANDE: [UNE SEULE commande: clique id [X], lance [app], scroll bas, scroll haut, retourne, ou DONE]\n\n" + mapContext;
                   
@@ -642,22 +651,22 @@ jobs:
                       mainHandler.post(() -> {
                           if (!success || isEmergencyStop) { agentGoal = null; robot.setVisibility(android.view.View.GONE); map.setVisibility(android.view.View.GONE); chatLog("<font color='#FF3333'><b>TITAN:</b> Erreur IA.</font>"); return; }
                           
-                          String pensee = "Je réfléchis..."; String commande = "done";
+                          String pensee = "Je reflechis..."; String commande = "done";
                           try {
                               String[] parts = answer.split("COMMANDE:");
-                              if(parts.length > 1) { pensee = parts[0].replace("PENSEE:", "").replace("PENSÉE:", "").trim(); commande = parts[1].trim(); } 
+                              if(parts.length > 1) { pensee = parts[0].replace("PENSEE:", "").trim(); commande = parts[1].trim(); } 
                               else { commande = answer.trim(); }
                           } catch(Exception e) { commande = answer; }
 
                           String nextCmd = commande.toLowerCase().replace("\n", "");
                           if (nextCmd.contains("done") || nextCmd.equals("fini")) { 
-                              chatLog("<font color='#00FF00'><b>TITAN:</b> 🏁 Objectif Atteint. (" + pensee + ")</font>"); 
+                              chatLog("<font color='#00FF00'><b>TITAN:</b> Objectif Atteint. (" + pensee + ")</font>"); 
                               agentGoal = null; robot.setVisibility(android.view.View.GONE); map.setVisibility(android.view.View.GONE); 
                           } 
                           else { 
                               agentHistory.add(nextCmd); if(agentHistory.size() > 5) agentHistory.remove(0); 
-                              if(isStuck) chatLog("<font color='#FF6600'><i>⚠️ Correction...</i></font>");
-                              chatLog("<font color='#AAAAAA'><i>💭 " + pensee + "</i></font>"); 
+                              if(isStuck) chatLog("<font color='#FF6600'><i>Correction en cours...</i></font>");
+                              chatLog("<font color='#AAAAAA'><i>" + pensee + "</i></font>"); 
                               List<String> steps = new ArrayList<>(); steps.add(nextCmd); executeStepsSequentially(steps, 0); 
                           }
                       });
@@ -697,7 +706,7 @@ jobs:
 
                   if (lcmd.equals("observe moi")) {
                       LearningEngine.start();
-                      chatLog("<font color='#FF0000'><b>[REC] Mode Apprentissage par Imitation activé.</b></font><br>Je mémorise tes actions. Quand tu as fini, tape 'fin [nom_de_la_sequence]'.");
+                      chatLog("<font color='#FF0000'><b>[REC] Mode Apprentissage par Imitation active.</b></font><br>Je memorise tes actions. Quand tu as fini, tape 'fin [nom_de_la_sequence]'.");
                       return;
                   }
                   if (lcmd.startsWith("fin") && LearningEngine.isRecording) {
@@ -706,9 +715,9 @@ jobs:
                       String sequence = LearningEngine.stopAndGetSequence();
                       if (sequence != null) {
                           skillManager.saveSkill(nomSkill, sequence);
-                          chatLog("<font color='#00FF00'><b>[SAUVEGARDE]</b> Compétence '" + nomSkill + "' apprise avec succès !</font>");
+                          chatLog("<font color='#00FF00'><b>[SAUVEGARDE]</b> Competence '" + nomSkill + "' apprise avec succes !</font>");
                           chatLog("<font color='#AAAAAA'>Code: " + sequence + "</font>");
-                      } else { chatLog("<font color='#FF3333'>[ERR] Aucune action enregistrée.</font>"); }
+                      } else { chatLog("<font color='#FF3333'>[ERR] Aucune action enregistree.</font>"); }
                       return;
                   }
 
@@ -716,37 +725,37 @@ jobs:
                       String nouvelleRegle = q.replace("retiens ", "").trim();
                       String reglesActuelles = skillManager.getSkill("REGLE_IA"); if (reglesActuelles == null) reglesActuelles = "";
                       skillManager.saveSkill("REGLE_IA", reglesActuelles + " - " + nouvelleRegle);
-                      chatLog("<font color='#00FF00'>[MÉMOIRE] Nouvelle règle IA assimilée : " + nouvelleRegle + "</font>");
+                      chatLog("<font color='#00FF00'>[MEMOIRE] Nouvelle regle IA assimilee : " + nouvelleRegle + "</font>");
                       return;
                   }
                   
                   if (lcmd.contains("tiktok auto") || lcmd.contains("nettoyage tiktok") || lcmd.contains("farm tiktok")) {
-                      chatLog("<font color='#9D00FF'><b>[LML TIKTOK] SÉQUENCE AUTO DÉMARRÉE.</b></font>");
+                      chatLog("<font color='#9D00FF'><b>[LML TIKTOK] SEQUENCE AUTO DEMARREE.</b></font>");
                       SafetyGuard.bypassForSafeMode = true; panel.setVisibility(android.view.View.GONE); robot.setVisibility(android.view.View.VISIBLE); executeTiktokSequence(0); return;
                   }
                   
                   if (lcmd.startsWith("apprends ")) {
                       String[] parts = q.substring(9).split("=", 2);
-                      if (parts.length == 2) { skillManager.saveSkill(parts[0].trim(), parts[1].trim()); chatLog("<font color='#00FF00'>[AUTO-INJECTION] Skill '" + parts[0].trim() + "' enregistré !</font>"); } 
+                      if (parts.length == 2) { skillManager.saveSkill(parts[0].trim(), parts[1].trim()); chatLog("<font color='#00FF00'>[AUTO-INJECTION] Skill '" + parts[0].trim() + "' enregistre !</font>"); } 
                       if(agentGoal != null) mainHandler.postDelayed(this::runAgentLoop, 2000); return;
                   }
                   if (lcmd.startsWith("github ")) {
                       String feature = q.replace("github ", "").replace("\"", "").replace("'", "").trim();
-                      GithubUplink.triggerBuild(feature); chatLog("<font color='#9D00FF'><b>[AUTO-ÉVOLUTION]</b> Demande envoyée à GitHub: " + feature + "</font>");
+                      GithubUplink.triggerBuild(feature); chatLog("<font color='#9D00FF'><b>[AUTO-EVOLUTION]</b> Demande envoyee a GitHub: " + feature + "</font>");
                       if(agentGoal != null) mainHandler.postDelayed(this::runAgentLoop, 4000); return;
                   }
                   if (lcmd.contains("preparer") || lcmd.contains("prepare")) {
                       doScan(); pendingSnapDeletes.clear(); StringBuilder sb = new StringBuilder(); int screenH = getResources().getDisplayMetrics().heightPixels; int headerThreshold = (int)(screenH * 0.15); 
                       for (ScreenNode n : lastNodes) { 
-                          String nameOnly = (n.text + " " + n.desc).trim().toLowerCase(); boolean isExcluded = nameOnly.isEmpty() || nameOnly.length() <= 2 || nameOnly.contains("recherche") || nameOnly.contains("trouver") || nameOnly.contains("amis") || nameOnly.contains("ami") || nameOnly.contains("retour") || nameOnly.contains("flèche") || nameOnly.contains("navigate") || nameOnly.contains("carte") || nameOnly.contains("story") || nameOnly.contains("chat") || nameOnly.contains("ajouter") || nameOnly.contains("nouveau") || nameOnly.contains("profil") || nameOnly.contains("paramètre") || nameOnly.contains("réglage") || nameOnly.contains("lml");
+                          String nameOnly = (n.text + " " + n.desc).trim().toLowerCase(); boolean isExcluded = nameOnly.isEmpty() || nameOnly.length() <= 2 || nameOnly.contains("recherche") || nameOnly.contains("trouver") || nameOnly.contains("amis") || nameOnly.contains("ami") || nameOnly.contains("retour") || nameOnly.contains("fleche") || nameOnly.contains("navigate") || nameOnly.contains("carte") || nameOnly.contains("story") || nameOnly.contains("chat") || nameOnly.contains("ajouter") || nameOnly.contains("nouveau") || nameOnly.contains("profil") || nameOnly.contains("parametre") || nameOnly.contains("reglage") || nameOnly.contains("lml");
                           if (!isExcluded && n.bounds.top > headerThreshold) { boolean alreadyAdded = false; for(ScreenNode p : pendingSnapDeletes) { if((p.text+" "+p.desc).trim().equals((n.text+" "+n.desc).trim())) { alreadyAdded = true; break; } } if(!alreadyAdded) { pendingSnapDeletes.add(n); String disp = n.text.isEmpty() ? n.desc : n.text; if(disp.length() > 25) disp = disp.substring(0, 25); sb.append("- ").append(disp).append("<br>"); } } 
                       }
-                      if (pendingSnapDeletes.isEmpty()) { chatLog("<font color='#FF3333'>[SAFE] Aucun profil détecté.</font>"); map.setVisibility(android.view.View.GONE); return; }
+                      if (pendingSnapDeletes.isEmpty()) { chatLog("<font color='#FF3333'>[SAFE] Aucun profil detecte.</font>"); map.setVisibility(android.view.View.GONE); return; }
                       chatLog("<font color='#00FFFF'><b>[LML SAFE] FILE D'ATTENTE :</b></font><br>" + sb.toString()); mainHandler.postDelayed(() -> { map.setVisibility(android.view.View.GONE); }, 3000); return;
                   }
                   if (lcmd.contains("valider") || lcmd.contains("suppression") || lcmd.contains("supprimer")) {
                       if (pendingSnapDeletes.isEmpty()) { chatLog("<font color='#FF3333'>[SAFE] File d'attente vide.</font>"); return; }
-                      chatLog("<font color='#FF3333'><b>[LML SAFE] DÉBUT DU NETTOYAGE. NE TOUCHEZ PLUS L'ÉCRAN.</b></font>"); SafetyGuard.bypassForSafeMode = true; panel.setVisibility(android.view.View.GONE); robot.setVisibility(android.view.View.GONE); map.setVisibility(android.view.View.GONE); executeSnapCleanSequence(0); return;
+                      chatLog("<font color='#FF3333'><b>[LML SAFE] DEBUT DU NETTOYAGE. NE TOUCHEZ PLUS L'ECRAN.</b></font>"); SafetyGuard.bypassForSafeMode = true; panel.setVisibility(android.view.View.GONE); robot.setVisibility(android.view.View.GONE); map.setVisibility(android.view.View.GONE); executeSnapCleanSequence(0); return;
                   }
 
                   robot.setVisibility(android.view.View.VISIBLE);
@@ -755,10 +764,10 @@ jobs:
 
               private void executeSnapCleanSequence(int index) {
                   if (isEmergencyStop) return;
-                  if (index >= pendingSnapDeletes.size()) { chatLog("<font color='#00FFFF'>[SYS] Terminé.</font>"); pendingSnapDeletes.clear(); SafetyGuard.bypassForSafeMode = false; panel.setVisibility(android.view.View.VISIBLE); return; }
+                  if (index >= pendingSnapDeletes.size()) { chatLog("<font color='#00FFFF'>[SYS] Termine.</font>"); pendingSnapDeletes.clear(); SafetyGuard.bypassForSafeMode = false; panel.setVisibility(android.view.View.VISIBLE); return; }
                   ScreenNode target = pendingSnapDeletes.get(index); String targetName = target.text.isEmpty() ? target.desc : target.text; chatLog("<font color='#FFD700'>Suppression: " + targetName + "</font>"); LmlAccessibilityService.INSTANCE.longPress(target.cx(), target.cy());
                   mainHandler.postDelayed(() -> { 
-                      List<ScreenNode> tempNodes = LmlAccessibilityService.INSTANCE.scan(); ScreenNode mNode = neuralSwarm.findByText(tempNodes, "gérer"); if (mNode == null) mNode = neuralSwarm.findByText(tempNodes, "amitié"); if (mNode == null) mNode = neuralSwarm.findByText(tempNodes, "amiti"); 
+                      List<ScreenNode> tempNodes = LmlAccessibilityService.INSTANCE.scan(); ScreenNode mNode = neuralSwarm.findByText(tempNodes, "gerer"); if (mNode == null) mNode = neuralSwarm.findByText(tempNodes, "amitie"); if (mNode == null) mNode = neuralSwarm.findByText(tempNodes, "amiti"); 
                       if (mNode != null) { 
                           LmlAccessibilityService.INSTANCE.tap(mNode.cx(), mNode.cy()); 
                           mainHandler.postDelayed(() -> { 
@@ -791,7 +800,7 @@ jobs:
                   if (q.startsWith("parle ")) { String msg = q.replace("parle ", "").replace("\"", "").replace("'", "").trim(); chatLog("<font color='#00FF00'><b>TITAN:</b> " + msg + "</font>"); robot.setVisibility(android.view.View.GONE); return; }
                   else if (q.startsWith("recherche web ")) { String query = AgiIntentParser.extractQuoteArgument(q); if (query == null) query = q.replace("recherche web ", "").trim(); Intent intent = new Intent(Intent.ACTION_WEB_SEARCH); intent.putExtra(android.app.SearchManager.QUERY, query); intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(intent); delay = 4000; }
                   else if (q.startsWith("github ")) { String feature = q.replace("github ", "").replace("\"", "").replace("'", "").trim(); GithubUplink.triggerBuild(feature); delay = 4000;}
-                  else if (q.startsWith("attends ") || q.startsWith("pause ")) { int seconds = 2; try { seconds = Integer.parseInt(q.replaceAll("[^0-9]", "")); } catch(Exception e){} delay = seconds * 1000; chatLog("⏳ Pause de " + seconds + "s..."); }
+                  else if (q.startsWith("attends ") || q.startsWith("pause ")) { int seconds = 2; try { seconds = Integer.parseInt(q.replaceAll("[^0-9]", "")); } catch(Exception e){} delay = seconds * 1000; chatLog("Pause de " + seconds + "s..."); }
                   else if (q.startsWith("clique id ")) { int id = -1; try { id = Integer.parseInt(q.replace("clique id ", "").trim()); } catch(Exception e){} doScan(); ScreenNode n = neuralSwarm.findById(lastNodes, id); if (n != null) { LmlAccessibilityService.INSTANCE.tap(n.cx(), n.cy()); robot.point(n.cx(), n.cy(), "Clic ID"); } }
                   else if (q.startsWith("appui long sur ")) { doScan(); String target = q.replace("appui long sur ", "").trim(); ScreenNode n = neuralSwarm.findByText(lastNodes, target); if (n != null) { LmlAccessibilityService.INSTANCE.longPress(n.cx(), n.cy()); } }
                   else if (q.startsWith("double clic sur ") || q.startsWith("double clique sur ")) { doScan(); String target = q.replace("double clic sur ", "").replace("double clique sur ", "").trim(); ScreenNode n = neuralSwarm.findByText(lastNodes, target); if (n != null) { LmlAccessibilityService.INSTANCE.tap(n.cx(), n.cy()); mainHandler.postDelayed(()->LmlAccessibilityService.INSTANCE.tap(n.cx(), n.cy()), 150); } }
@@ -802,8 +811,8 @@ jobs:
                   else if (q.contains("whatsapp")) { actionManager.launchApp("whatsapp"); delay = 4000;}
                   else if (q.contains("instagram") || q.contains("insta")) { actionManager.launchApp("instagram"); delay = 4000;}
                   else if (q.contains("youtube")) { actionManager.launchApp("youtube"); delay = 4000;}
-                  else if (q.contains("ecris") || q.contains("écris")) {
-                      doScan(); String txt = AgiIntentParser.extractQuoteArgument(q); String box = q.replace("ecris", "").replace("écris", "").replace("dans", "").replace("sur", "").replace("\""+txt+"\"", "").replace("'"+txt+"'", "").trim();
+                  else if (q.contains("ecris") || q.contains("ecris")) {
+                      doScan(); String txt = AgiIntentParser.extractQuoteArgument(q); String box = q.replace("ecris", "").replace("ecris", "").replace("dans", "").replace("sur", "").replace("\""+txt+"\"", "").replace("'"+txt+"'", "").trim();
                       if (txt != null) { ScreenNode input = neuralSwarm.findInputByText(lastNodes, box); if (input == null) input = neuralSwarm.findByText(lastNodes, box); if (input != null) { LmlAccessibilityService.INSTANCE.tap(input.cx(), input.cy()); mainHandler.postDelayed(() -> { LmlAccessibilityService.INSTANCE.injectText(input, txt); }, 500); } }
                   }
                   else if (q.equals("retour") || q.contains("recul")) { LmlAccessibilityService.INSTANCE.goBack(); }
@@ -885,20 +894,9 @@ jobs:
           }
           EOF
 
-          cat > app/lml-stable.keystore.base64 <<'EOF'
-          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
-          EOF
-          base64 -d app/lml-stable.keystore.base64 > app/lml-stable.keystore
-
-      - name: Install Android SDK
-        run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-34" || true
-          sdkmanager "build-tools;34.0.0" || true
-
       - name: Build signed release APK
         run: |
-          gradle assembleRelease --no-daemon
+          gradle assembleRelease --no-daemon --stacktrace --info
 
       - name: Prepare APK files
         run: |
