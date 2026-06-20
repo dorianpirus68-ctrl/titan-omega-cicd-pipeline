@@ -1,4 +1,4 @@
-name: LML ROBOT V42 TITAN PHOENIX (TIKTOK EDITION)
+name: LML ROBOT V42 TITAN PHOENIX (LEARNING EDITION)
 
 on:
   push:
@@ -96,7 +96,7 @@ jobs:
           cat > app/src/main/res/values/strings.xml <<'EOF'
           <resources>
               <string name="app_name">LML V42 PHOENIX</string>
-              <string name="accessibility_desc">LML AGI V42 : Auto-Correction, Résolution d\'erreurs, Nettoyage TikTok & Snap.</string>
+              <string name="accessibility_desc">LML AGI V42 : Auto-Correction, Apprentissage Humain, Nettoyage TikTok & Snap.</string>
           </resources>
           EOF
 
@@ -132,6 +132,52 @@ jobs:
           </manifest>
           EOF
 
+          cat > app/src/main/java/com/lml/robotai/HumanMotion.java <<'EOF'
+          package com.lml.robotai;
+          import android.accessibilityservice.AccessibilityService; import android.accessibilityservice.GestureDescription; import android.graphics.Path; import java.util.Random;
+          public class HumanMotion {
+              private static final Random rng = new Random();
+              public static void tap(AccessibilityService s, int x, int y) {
+                  try {
+                      int ox = x + (rng.nextInt(20) - 10); int oy = y + (rng.nextInt(20) - 10);
+                      Path p = new Path(); p.moveTo(ox, oy); p.lineTo(ox+1, oy+1);
+                      s.dispatchGesture(new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(p, 0, 40 + rng.nextInt(60))).build(), null, null);
+                  } catch(Exception e){}
+              }
+              public static void swipe(AccessibilityService s, int sx, int sy, int ex, int ey) {
+                  try {
+                      Path p = new Path(); p.moveTo(sx, sy);
+                      int cx = sx + (rng.nextInt(100) - 50); int cy = sy + (ey - sy)/2;
+                      p.quadTo(cx, cy, ex, ey);
+                      s.dispatchGesture(new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(p, 0, 300 + rng.nextInt(300))).build(), null, null);
+                  } catch(Exception e){}
+              }
+          }
+          EOF
+
+          cat > app/src/main/java/com/lml/robotai/LearningEngine.java <<'EOF'
+          package com.lml.robotai;
+          import java.util.ArrayList; import java.util.List;
+          public class LearningEngine {
+              public static boolean isRecording = false; public static List<String> steps = new ArrayList<>(); private static long lastActionTime = 0;
+              public static void start() { isRecording = true; steps.clear(); lastActionTime = System.currentTimeMillis(); }
+              public static void recordClick(String nodeLabel) {
+                  if(!isRecording || nodeLabel == null || nodeLabel.trim().isEmpty()) return;
+                  long now = System.currentTimeMillis();
+                  if(lastActionTime > 0) {
+                      int seconds = Math.max(1, (int)((now - lastActionTime) / 1000));
+                      steps.add("attends " + seconds);
+                  }
+                  steps.add("clique sur \"" + nodeLabel.trim() + "\"");
+                  lastActionTime = now;
+              }
+              public static String stopAndGetSequence() {
+                  isRecording = false; if(steps.isEmpty()) return null;
+                  return String.join(" puis ", steps);
+              }
+          }
+          EOF
+
           cat > app/src/main/java/com/lml/robotai/SkillManager.java <<'EOF'
           package com.lml.robotai;
           import android.content.Context; import android.content.SharedPreferences; import java.util.Map;
@@ -164,7 +210,7 @@ jobs:
           
           public class AgiNetworkManager {
               private final ExecutorService executor = Executors.newSingleThreadExecutor();
-              private final String API_KEY = "TA_CLE_API_GEMINI_ICI"; 
+              private final String API_KEY = "TA_CLE_API_GEMINI_ICI"; // Ou l'IP de ton PC si tu utilises Ollama (ex: http://192.168.1.X:11434/api/generate)
               private final String ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=";
 
               public interface LlmCallback { void onResponse(String answer, boolean success); }
@@ -187,7 +233,7 @@ jobs:
                               String raw = resp.toString(); int start = raw.indexOf("\"text\": \"") + 9; int end = raw.indexOf("\"", start);
                               if (start > 8 && end > start) { cb.onResponse(raw.substring(start, end).replace("\\n", "\n").replace("\\\"", "\""), true); } 
                               else { cb.onResponse("Réponse Gemini illisible.", false); }
-                          } else { cb.onResponse("Erreur API Gemini HTTP: " + conn.getResponseCode(), false); }
+                          } else { cb.onResponse("Erreur API HTTP: " + conn.getResponseCode(), false); }
                       } catch (Exception e) { cb.onResponse("Erreur de connexion.", false); }
                   });
               }
@@ -206,15 +252,9 @@ jobs:
                       try {
                           URL url = new URL("https://api.github.com/repos/" + REPO + "/dispatches");
                           HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                          conn.setRequestMethod("POST");
-                          conn.setRequestProperty("Authorization", "Bearer " + GH_TOKEN);
-                          conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
-                          conn.setRequestProperty("Content-Type", "application/json");
-                          conn.setDoOutput(true);
-                          
+                          conn.setRequestMethod("POST"); conn.setRequestProperty("Authorization", "Bearer " + GH_TOKEN); conn.setRequestProperty("Accept", "application/vnd.github.v3+json"); conn.setRequestProperty("Content-Type", "application/json"); conn.setDoOutput(true);
                           String safeLog = newFeatureLog.replace("\"", "\\\"").replace("\n", " ");
                           String payload = "{\"event_type\": \"ai_self_update\", \"client_payload\": {\"feature\": \"" + safeLog + "\"}}";
-                          
                           try(OutputStream os = conn.getOutputStream()) { os.write(payload.getBytes("utf-8")); }
                           conn.getResponseCode();
                       } catch (Exception e) { e.printStackTrace(); }
@@ -389,7 +429,17 @@ jobs:
           public class LmlAccessibilityService extends AccessibilityService {
               public static LmlAccessibilityService INSTANCE; private List<ScreenNode> nodes = new ArrayList<>();
               @Override protected void onServiceConnected() { INSTANCE = this; }
-              @Override public void onAccessibilityEvent(AccessibilityEvent e) { }
+              @Override public void onAccessibilityEvent(AccessibilityEvent e) { 
+                  if (e.getEventType() == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+                      if (LearningEngine.isRecording && e.getSource() != null) {
+                          CharSequence txt = e.getSource().getText(); CharSequence desc = e.getSource().getContentDescription();
+                          String label = "";
+                          if (txt != null && txt.length() > 0) label = txt.toString();
+                          else if (desc != null && desc.length() > 0) label = desc.toString();
+                          if (!label.isEmpty()) { LearningEngine.recordClick(label); }
+                      }
+                  }
+              }
               @Override public void onInterrupt() {}
               
               public List<ScreenNode> scan() { 
@@ -411,9 +461,11 @@ jobs:
                   } return nodes; 
               }
 
-              public void tap(int x, int y) { try { Path path = new Path(); path.moveTo(x, y); path.lineTo(x + 1, y + 1); dispatchGesture(new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path, 0, 80)).build(), null, null); } catch (Exception e) {} }
+              // MODIFICATION: Utilisation de HumanMotion (Anti-Bot)
+              public void tap(int x, int y) { HumanMotion.tap(this, x, y); }
+              public void swipe(int startX, int startY, int endX, int endY) { HumanMotion.swipe(this, startX, startY, endX, endY); }
+              
               public void longPress(int x, int y) { try { Path path = new Path(); path.moveTo(x, y); path.lineTo(x + 1, y + 1); dispatchGesture(new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path, 0, 1000)).build(), null, null); } catch (Exception e) {} }
-              public void swipe(int startX, int startY, int endX, int endY) { try { Path path = new Path(); path.moveTo(startX, startY); path.lineTo(endX, endY); dispatchGesture(new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path, 0, 400)).build(), null, null); } catch (Exception e) {} }
               public void dragAndDrop(int startX, int startY, int endX, int endY) { try { Path path = new Path(); path.moveTo(startX, startY); path.lineTo(endX, endY); dispatchGesture(new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path, 0, 1500)).build(), null, null); } catch (Exception e) {} }
               public void pinchZoom(int centerX, int centerY, boolean zoomIn) {
                   try {
@@ -421,9 +473,7 @@ jobs:
                       int offset = zoomIn ? 100 : 300; int endOffset = zoomIn ? 300 : 100;
                       path1.moveTo(centerX - offset, centerY); path1.lineTo(centerX - endOffset, centerY);
                       path2.moveTo(centerX + offset, centerY); path2.lineTo(centerX + endOffset, centerY);
-                      GestureDescription.Builder builder = new GestureDescription.Builder();
-                      builder.addStroke(new GestureDescription.StrokeDescription(path1, 0, 400));
-                      builder.addStroke(new GestureDescription.StrokeDescription(path2, 0, 400));
+                      GestureDescription.Builder builder = new GestureDescription.Builder(); builder.addStroke(new GestureDescription.StrokeDescription(path1, 0, 400)); builder.addStroke(new GestureDescription.StrokeDescription(path2, 0, 400));
                       dispatchGesture(builder.build(), null, null);
                   } catch (Exception e) {}
               }
@@ -524,12 +574,12 @@ jobs:
                   pp.gravity = Gravity.TOP | Gravity.START; pp.x = 20; pp.y = 100;
                   panel.setOnTouchListener((v,e)->{ if(e.getAction()==MotionEvent.ACTION_DOWN) { px=pp.x; py=pp.y; dx=e.getRawX(); dy=e.getRawY(); return false; } if(e.getAction()==MotionEvent.ACTION_MOVE) { pp.x=px+(int)(e.getRawX()-dx); pp.y=py+(int)(e.getRawY()-dy); wm.updateViewLayout(panel,pp); return false; } return false; });
                   wm.addView(panel, pp); updatePanelVisibility();
-                  chatLog("<font color='#00FFFF'><b>TITAN:</b> Système PHOENIX prêt. Tape 'tiktok auto' pour lancer le script TikTok.</font>");
+                  chatLog("<font color='#00FFFF'><b>TITAN:</b> Système PHOENIX prêt. Mouvement Anti-Bot activé. Tape 'observe moi' pour m'apprendre des actions.</font>");
               }
               
               private void triggerPanic() {
                   isEmergencyStop = true; mainHandler.removeCallbacksAndMessages(null); pendingSnapDeletes.clear(); 
-                  agentGoal = null; agentHistory.clear(); SafetyGuard.bypassForSafeMode = false;
+                  agentGoal = null; agentHistory.clear(); SafetyGuard.bypassForSafeMode = false; LearningEngine.isRecording = false;
                   robot.setVisibility(android.view.View.GONE); map.setVisibility(android.view.View.GONE);
                   chatLog("<font color='#FF0000'><b>[TITAN]: ARRÊT D'URGENCE COMPLET.</b></font>"); Toast.makeText(this, "TITAN: STOP", Toast.LENGTH_SHORT).show(); startLoops();
               }
@@ -558,7 +608,7 @@ jobs:
                   String skillExpanded = skillManager.getSkill(lcmd);
                   if (skillExpanded != null) { chatLog("<font color='#9D00FF'>[SKILL] Déploiement: " + skillExpanded + "</font>"); fullCmd = skillExpanded; lcmd = skillExpanded.toLowerCase(); }
                   
-                  boolean isComplex = !lcmd.startsWith("clique") && !lcmd.startsWith("scroll") && !lcmd.startsWith("lance") && !lcmd.startsWith("recherche web") && !lcmd.startsWith("github") && !lcmd.contains(" puis ") && !lcmd.startsWith("preparer") && !lcmd.startsWith("valider") && !lcmd.startsWith("apprends") && !lcmd.contains("tiktok");
+                  boolean isComplex = !lcmd.startsWith("clique") && !lcmd.startsWith("scroll") && !lcmd.startsWith("lance") && !lcmd.startsWith("recherche web") && !lcmd.startsWith("github") && !lcmd.contains(" puis ") && !lcmd.startsWith("preparer") && !lcmd.startsWith("valider") && !lcmd.startsWith("apprends") && !lcmd.contains("tiktok") && !lcmd.contains("observe moi") && !lcmd.startsWith("fin");
                   if (lcmd.startsWith("auto ") || lcmd.startsWith("agent ") || isComplex) {
                       agentGoal = fullCmd.replace("auto ", "").replace("agent ", "").trim(); agentHistory.clear();
                       chatLog("<font color='#9D00FF'><b>[TITAN PHOENIX] Je prends le contrôle. Objectif : " + agentGoal + "</b></font>");
@@ -569,22 +619,23 @@ jobs:
                   cot.process(finalCmd, step -> mainHandler.post(() -> { if (step.contains("Validation Exec")) executeCommand(finalCmd); }));
               }
 
-              // 🧠 CERVEAU PHOENIX (Auto-Correction)
               private void runAgentLoop() {
                   if (isEmergencyStop || agentGoal == null) return;
                   doScan(); String mapContext = ScreenAnalyzer.exportCognitiveMap(lastNodes);
                   String hist = agentHistory.isEmpty() ? "Aucune action" : String.join(" -> ", agentHistory);
                   
                   boolean isStuck = agentHistory.size() >= 2 && agentHistory.get(agentHistory.size()-1).equals(agentHistory.get(agentHistory.size()-2));
-                  String stuckWarning = isStuck ? "⚠️ ALERTE: L'action précédente a ÉCHOUÉ (l'écran n'a pas changé). Tu DOIS ABSOLUMENT CHANGER DE STRATÉGIE (ex: scroller, faire retour, ou 'parle' pour m'appeler à l'aide). " : "";
+                  String stuckWarning = isStuck ? "⚠️ ALERTE: L'action précédente a ÉCHOUÉ (l'écran n'a pas changé). Tu DOIS ABSOLUMENT CHANGER DE STRATÉGIE. " : "";
                   
-                  String prompt = "Tu es TITAN V42, une AGI auto-correctrice absolue. Ton OBJECTIF est: '" + agentGoal + "'.\n" +
-                                  "HISTORIQUE: " + hist + ".\n" + stuckWarning + 
-                                  "REGLES: 1) Utilise la Vision par ID (ex: clique id 5). 2) Auto-corrige-toi si tu es bloqué. " +
-                                  "3) Utilise 'parle [msg]' pour m'appeler à l'aide en dernier recours. " +
+                  String memoire = skillManager.getSkill("REGLE_IA");
+                  String reglesUtilisateur = (memoire != null && !memoire.isEmpty()) ? " REGLES PERSO: " + memoire : "";
+
+                  String prompt = "Tu es TITAN V42, une AGI auto-correctrice. Ton OBJECTIF est: '" + agentGoal + "'.\n" +
+                                  "HISTORIQUE: " + hist + ".\n" + stuckWarning + reglesUtilisateur +
+                                  "REGLES: 1) Utilise la Vision par ID (ex: clique id 5). 2) Auto-corrige-toi si bloqué. " +
                                   "RÉPONDS STRICTEMENT DANS CE FORMAT:\n" +
-                                  "PENSEE: [Évalue ton action précédente, et explique ta nouvelle stratégie]\n" +
-                                  "COMMANDE: [UNE SEULE commande parmi: clique id [X], lance [app], recherche web '[req]', ecris '[txt]' dans [champ], scroll bas, scroll haut, parle '[msg]', apprends [nom]=[code], github '[demande]', retour, accueil, ou DONE]\n\n" + mapContext;
+                                  "PENSEE: [Ton raisonnement]\n" +
+                                  "COMMANDE: [UNE SEULE commande: clique id [X], lance [app], scroll bas, scroll haut, retourne, ou DONE]\n\n" + mapContext;
                   
                   robot.setVisibility(android.view.View.VISIBLE);
                   networkManager.sendPrompt("SYSTEME", prompt, (answer, success) -> {
@@ -605,7 +656,7 @@ jobs:
                           } 
                           else { 
                               agentHistory.add(nextCmd); if(agentHistory.size() > 5) agentHistory.remove(0); 
-                              if(isStuck) chatLog("<font color='#FF6600'><i>⚠️ Correction en cours...</i></font>");
+                              if(isStuck) chatLog("<font color='#FF6600'><i>⚠️ Correction...</i></font>");
                               chatLog("<font color='#AAAAAA'><i>💭 " + pensee + "</i></font>"); 
                               List<String> steps = new ArrayList<>(); steps.add(nextCmd); executeStepsSequentially(steps, 0); 
                           }
@@ -613,12 +664,9 @@ jobs:
                   });
               }
 
-              // 🤖 SÉQUENCE TIKTOK
               private void executeTiktokSequence(int count) {
                   if (isEmergencyStop) return;
-                  
                   doScan();
-                  
                   ScreenNode targetBtn = neuralSwarm.findByText(lastNodes, "suivre"); 
                   if (targetBtn == null) targetBtn = neuralSwarm.findByText(lastNodes, "ami");
                   if (targetBtn == null) targetBtn = neuralSwarm.findByText(lastNodes, "abonner");
@@ -627,12 +675,10 @@ jobs:
                       chatLog("<font color='#00FFFF'>[TIKTOK] Clic sur: " + targetBtn.label() + "</font>");
                       LmlAccessibilityService.INSTANCE.tap(targetBtn.cx(), targetBtn.cy());
                       robot.point(targetBtn.cx(), targetBtn.cy(), "Clic TikTok");
-                      
                       mainHandler.postDelayed(() -> {
                           scrollTiktokList();
                           mainHandler.postDelayed(() -> executeTiktokSequence(count + 1), 2000);
                       }, 1500);
-                      
                   } else {
                       chatLog("<font color='#AAAAAA'>[TIKTOK] Scan vide, scroll bas...</font>");
                       scrollTiktokList();
@@ -648,15 +694,36 @@ jobs:
 
               private void executeCommand(String q) {
                   String lcmd = q.toLowerCase();
+
+                  // --- NOUVEAU : MODE APPRENTISSAGE PAR IMITATION ---
+                  if (lcmd.equals("observe moi")) {
+                      LearningEngine.start();
+                      chatLog("<font color='#FF0000'><b>[REC] Mode Apprentissage par Imitation activé.</b></font><br>Je mémorise tes actions. Quand tu as fini, tape 'fin [nom_de_la_sequence]'.");
+                      return;
+                  }
+                  if (lcmd.startsWith("fin") && LearningEngine.isRecording) {
+                      String nomSkill = q.replace("fin", "").trim();
+                      if (nomSkill.isEmpty()) nomSkill = "auto_skill_" + System.currentTimeMillis();
+                      String sequence = LearningEngine.stopAndGetSequence();
+                      if (sequence != null) {
+                          skillManager.saveSkill(nomSkill, sequence);
+                          chatLog("<font color='#00FF00'><b>[SAUVEGARDE]</b> Compétence '" + nomSkill + "' apprise avec succès !</font>");
+                          chatLog("<font color='#AAAAAA'>Code: " + sequence + "</font>");
+                      } else { chatLog("<font color='#FF3333'>[ERR] Aucune action enregistrée.</font>"); }
+                      return;
+                  }
+
+                  if (lcmd.startsWith("retiens ")) {
+                      String nouvelleRegle = q.replace("retiens ", "").trim();
+                      String reglesActuelles = skillManager.getSkill("REGLE_IA"); if (reglesActuelles == null) reglesActuelles = "";
+                      skillManager.saveSkill("REGLE_IA", reglesActuelles + " - " + nouvelleRegle);
+                      chatLog("<font color='#00FF00'>[MÉMOIRE] Nouvelle règle IA assimilée : " + nouvelleRegle + "</font>");
+                      return;
+                  }
                   
-                  // DÉCLENCHEUR TIKTOK
                   if (lcmd.contains("tiktok auto") || lcmd.contains("nettoyage tiktok") || lcmd.contains("farm tiktok")) {
                       chatLog("<font color='#9D00FF'><b>[LML TIKTOK] SÉQUENCE AUTO DÉMARRÉE.</b></font>");
-                      SafetyGuard.bypassForSafeMode = true; 
-                      panel.setVisibility(android.view.View.GONE);
-                      robot.setVisibility(android.view.View.VISIBLE);
-                      executeTiktokSequence(0); 
-                      return;
+                      SafetyGuard.bypassForSafeMode = true; panel.setVisibility(android.view.View.GONE); robot.setVisibility(android.view.View.VISIBLE); executeTiktokSequence(0); return;
                   }
                   
                   if (lcmd.startsWith("apprends ")) {
